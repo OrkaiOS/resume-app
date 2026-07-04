@@ -1,0 +1,18 @@
+# Local environment (see .env.example)
+.env
+
+# Compiled binary
+/resume-app
+/bin/
+
+# Local SQLite database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Generated PDFs (local output only)
+/generated/
+
+# Test coverage output
+*.out
