@@ -24,6 +24,7 @@ func Run() error {
 		middleware.Recovery(),
 		middleware.Logging(),
 		metrics.Handler(),
+		middleware.CORS(cfg.CORSAllowedOrigins),
 	)
 
 	health := handlers.NewHealthHandler()

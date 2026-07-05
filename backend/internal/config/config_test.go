@@ -61,6 +61,7 @@ func TestLoad_SuccessReadsAllVars(t *testing.T) {
 	t.Setenv("LLM_MODEL", "llama3")
 	t.Setenv("LLM_API_KEY", "secret")
 	t.Setenv("OUTPUT_DIR", "/tmp/out")
+	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 
 	cfg, err := Load()
 	if err != nil {
@@ -83,6 +84,9 @@ func TestLoad_SuccessReadsAllVars(t *testing.T) {
 	}
 	if cfg.OutputDir != "/tmp/out" {
 		t.Errorf("OutputDir = %q, want /tmp/out", cfg.OutputDir)
+	}
+	if cfg.CORSAllowedOrigins != "http://localhost:5173" {
+		t.Errorf("CORSAllowedOrigins = %q, want http://localhost:5173", cfg.CORSAllowedOrigins)
 	}
 }
 
