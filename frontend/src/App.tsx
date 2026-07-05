@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
-import { OrkaiHealthProvider, useOrkaiHealth } from "@/hooks/useOrkaiHealth"
+import OrkaiHealthProvider from "@/hooks/OrkaiHealthProvider"
+import { useOrkaiHealth } from "@/hooks/useOrkaiHealth"
 import OrkaiStatusPage from "@/pages/OrkaiStatusPage"
 
 function AppContent() {

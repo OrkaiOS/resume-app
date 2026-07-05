@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { OrkaiHealthProvider, useOrkaiHealth } from './useOrkaiHealth'
+import OrkaiHealthProvider from './OrkaiHealthProvider'
+import { useOrkaiHealth } from './useOrkaiHealth'
 
 describe('OrkaiHealthProvider', () => {
   it('is a function component', () => {

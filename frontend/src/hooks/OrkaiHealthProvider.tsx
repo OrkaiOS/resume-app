@@ -1,21 +1,13 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
 } from "react"
+import { OrkaiHealthContext } from "./useOrkaiHealth"
 
 const POLL_INTERVAL_MS = 5000
 const HEALTH_URL = "/v1/api/health/orkai"
-
-interface OrkaiHealthContextValue {
-  isOrkaiRunning: boolean | null
-  checkHealth: () => Promise<boolean>
-}
-
-const OrkaiHealthContext = createContext<OrkaiHealthContextValue | null>(null)
 
 function OrkaiHealthProvider({ children }: { children: React.ReactNode }) {
   const [isOrkaiRunning, setIsOrkaiRunning] = useState<boolean | null>(null)
@@ -35,12 +27,7 @@ function OrkaiHealthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const perform = async () => {
-      const running = await checkHealth()
-      return running
-    }
-
-    perform().then((running) => {
+    checkHealth().then((running) => {
       if (!running) {
         intervalRef.current = setInterval(async () => {
           const stillRunning = await checkHealth()
@@ -89,13 +76,4 @@ function OrkaiHealthProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-function useOrkaiHealth(): OrkaiHealthContextValue {
-  const ctx = useContext(OrkaiHealthContext)
-  if (!ctx) {
-    throw new Error("useOrkaiHealth must be used within OrkaiHealthProvider")
-  }
-  return ctx
-}
-
-export { OrkaiHealthProvider, useOrkaiHealth }
-export type { OrkaiHealthContextValue }
+export default OrkaiHealthProvider
