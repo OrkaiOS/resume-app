@@ -1,6 +1,18 @@
-import { Button } from '@/components/ui/button'
+import { Button } from "@/components/ui/button"
+import { OrkaiHealthProvider, useOrkaiHealth } from "@/hooks/useOrkaiHealth"
+import OrkaiStatusPage from "@/pages/OrkaiStatusPage"
 
-function App() {
+function AppContent() {
+  const { isOrkaiRunning } = useOrkaiHealth()
+
+  if (isOrkaiRunning === null) {
+    return <OrkaiStatusPage checking />
+  }
+
+  if (!isOrkaiRunning) {
+    return <OrkaiStatusPage />
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
@@ -9,6 +21,14 @@ function App() {
         <Button className="mt-6">Get Started</Button>
       </div>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <OrkaiHealthProvider>
+      <AppContent />
+    </OrkaiHealthProvider>
   )
 }
 
