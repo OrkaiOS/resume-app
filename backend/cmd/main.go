@@ -71,7 +71,10 @@ func Run() error {
 	router.GET("/health", health.Health)
 	router.GET("/metrics", metricsHandler.Metrics)
 
-	router.Group("/v1/api")
+	v1 := router.Group("/v1/api")
+
+	orkaiHealth := handlers.NewOrkaiHealthHandler(cfg.OrkaiHealthURL)
+	v1.GET("/health/orkai", orkaiHealth.CheckHealth)
 
 	if hasFrontendFS {
 		if err := serveSPA(router, prodFrontendFS); err != nil {

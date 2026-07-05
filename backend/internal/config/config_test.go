@@ -62,6 +62,7 @@ func TestLoad_SuccessReadsAllVars(t *testing.T) {
 	t.Setenv("LLM_API_KEY", "secret")
 	t.Setenv("OUTPUT_DIR", "/tmp/out")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+	t.Setenv("ORKAI_HEALTH_URL", "http://localhost:18787/health")
 
 	cfg, err := Load()
 	if err != nil {
@@ -87,6 +88,30 @@ func TestLoad_SuccessReadsAllVars(t *testing.T) {
 	}
 	if cfg.CORSAllowedOrigins != "http://localhost:5173" {
 		t.Errorf("CORSAllowedOrigins = %q, want http://localhost:5173", cfg.CORSAllowedOrigins)
+	}
+	if cfg.OrkaiHealthURL != "http://localhost:18787/health" {
+		t.Errorf("OrkaiHealthURL = %q, want http://localhost:18787/health", cfg.OrkaiHealthURL)
+	}
+}
+
+func TestLoad_RequiresOrkaiHealthURL(t *testing.T) {
+	t.Setenv("BACKEND_PORT", "8080")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for missing ORKAI_HEALTH_URL, got nil")
+	}
+	if !contains(err.Error(), "ORKAI_HEALTH_URL is required") {
+		t.Fatalf("Load() error = %q, want substring %q", err.Error(), "ORKAI_HEALTH_URL is required")
+	}
+
+	t.Setenv("ORKAI_HEALTH_URL", "")
+	_, err = Load()
+	if err == nil {
+		t.Fatal("Load() expected error for empty ORKAI_HEALTH_URL, got nil")
+	}
+	if !contains(err.Error(), "ORKAI_HEALTH_URL is required") {
+		t.Fatalf("Load() error = %q, want substring %q", err.Error(), "ORKAI_HEALTH_URL is required")
 	}
 }
 
