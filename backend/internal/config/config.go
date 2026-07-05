@@ -27,6 +27,8 @@ type Config struct {
 	OutputDir string
 	// CORSAllowedOrigins is a comma-separated list of allowed CORS origins.
 	CORSAllowedOrigins string
+	// OrkaiHealthURL is the URL of the orkai daemon health endpoint (required).
+	OrkaiHealthURL string
 }
 
 // Load reads environment variables and returns a Config.
@@ -44,6 +46,11 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("config.Load: BACKEND_PORT must be a positive integer, got %q", port)
 	}
 
+	orkaiHealthURL, ok := os.LookupEnv("ORKAI_HEALTH_URL")
+	if !ok || orkaiHealthURL == "" {
+		return Config{}, fmt.Errorf("config.Load: ORKAI_HEALTH_URL is required (set it to the orkai daemon health URL, e.g. http://localhost:18787/health)")
+	}
+
 	return Config{
 		Port:               port,
 		DBPath:             os.Getenv("DB_PATH"),
@@ -52,5 +59,6 @@ func Load() (Config, error) {
 		LLMAPIKey:          os.Getenv("LLM_API_KEY"),
 		OutputDir:          os.Getenv("OUTPUT_DIR"),
 		CORSAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
+		OrkaiHealthURL:     orkaiHealthURL,
 	}, nil
 }
