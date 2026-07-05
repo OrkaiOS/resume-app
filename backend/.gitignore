@@ -5,6 +5,9 @@
 /resume-app
 /bin/
 
+# SPA build output (embedded at build time)
+/cmd/static/
+
 # Local SQLite database
 *.db
 *.db-journal
