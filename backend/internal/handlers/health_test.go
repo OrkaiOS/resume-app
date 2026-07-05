@@ -75,6 +75,18 @@ func TestEnvelope_SuccessAndFailure(t *testing.T) {
 	if f.Data != nil || f.Error == nil || f.Error.Code != "VALIDATION_ERROR" || f.Error.Message != "missing field" {
 		t.Fatalf("Failure = %+v, want error envelope", f)
 	}
+	if f.Error.Details == nil {
+		t.Fatalf("Failure.Details = nil, want non-nil (empty object per API Contract Standard)")
+	}
+
+	d := FailureWithDetails("VALIDATION_ERROR", "bad input", map[string]string{"field": "email", "issue": "invalid format"})
+	if d.Error == nil || d.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("FailureWithDetails = %+v, want error envelope", d)
+	}
+	details, ok := d.Error.Details.(map[string]string)
+	if !ok || details["field"] != "email" {
+		t.Fatalf("FailureWithDetails.Details = %+v, want field-level map", d.Error.Details)
+	}
 }
 
 func contains(haystack, needle string) bool {
