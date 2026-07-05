@@ -67,14 +67,16 @@ intentionally global — do NOT scope those.
    - For each milestone whose status ≠ done: `tasks(action: "list",
      milestone_id: <id>, category_ids: [...])` and collect tasks whose
      status is `pending` or `in_progress`.
-   - Group the collected tasks under one of these headings by which role
-     workflow the task body names (or by path: `backend/**` → Backend
-     Developer, `frontend/**` → Frontend Developer):
-     - **Backend Developer (resume-app)** `2840ff4a-179d-4551-b1d5-c39130533961`
-     - **Frontend Developer (resume-app)** `6aee46f4-e39c-4f21-bcbc-3916a49dd464`
-     - **Feature Planner (resume-app)** `f87a7d22-8429-459f-8196-63155021ae11`
-       (tasks here are "draft the plan" work, not implementation)
-   - Tasks with no role-workflow assignment go under "Unassigned".
+- Group the collected tasks under one of these headings by which role
+      workflow the task body names (or by path: `backend/**` → Backend
+      Developer, `frontend/**` → Frontend Developer):
+      - **Backend Developer (resume-app)** `2840ff4a-179d-4551-b1d5-c39130533961`
+      - **Frontend Developer (resume-app)** `6aee46f4-e39c-4f21-bcbc-3916a49dd464`
+      - **Feature Planner (resume-app)** `f87a7d22-8429-459f-8196-63155021ae11`
+        (tasks here are "draft the plan" work, not implementation)
+      - **Architect (resume-app)** `8def40c2-89cc-47d2-ad16-dcf4adcc59a1`
+        (plan mode: before Feature Planner; review mode: after Developer)
+    - Tasks with no role-workflow assignment go under "Unassigned".
 4. **Brief the user**: summarize (a) what the latest session did, (b) current
    project status and relevant decisions, and (c) the grouped open work from
    step 3. Then ask: *"Which task should we start? Backend Developer / Frontend
@@ -234,20 +236,26 @@ workflow's scope — do NOT load them during session startup or onboarding.
 | Workflow | ID | Trigger | Gates |
 |----------|----|---------|-------|
 | Product Owner (resume-app) | `33e6b0c6-4603-4747-abd0-423ff16821f2` | Any requirements work: discovery, refinement, prioritization, validation. Owns `docs/requirement.md`. Shapes the product before planning begins. | INVEST quality, traceable acceptance criteria, consistent priorities |
+| Architect (resume-app) | `8def40c2-89cc-47d2-ad16-dcf4adcc59a1` | Plan mode: after PO refines requirements, before Feature Planner — identifies architecture docs and standards needed, researches without overengineering. Review mode: after Developer implementation — audits code against plan intent and standards, runs `orkai review`, fixes architecture/standards gaps. | Standards traceable to FRs, no overengineering, review config maintained |
 | Feature Planner (resume-app) | `f87a7d22-8429-459f-8196-63155021ae11` | Any new feature or significant change. Searches standards/skills/code, collects orkai entity IDs, drafts design, persists plan > milestone > tasks, updates `docs/plan/MASTER_PLAN.md`, presents for approval, STOP. | P4 plan persistence, task-body contract (standards IDs + role workflow per task) |
 | Backend Developer (resume-app) | `2840ff4a-179d-4551-b1d5-c39130533961` | Any implementation task touching `backend/**` (Go + Gin: handlers, services, models, middleware, store, cmd) | `go build`, `go vet`, `gofmt -l`, `go test` |
 | Frontend Developer (resume-app) | `6aee46f4-e39c-4f21-bcbc-3916a49dd464` | Any implementation task touching `frontend/**` (React + Vite + TS: components, pages, hooks, api, store, types, lib) | `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` |
 
 The Product Owner shapes the product in `docs/requirement.md` (what and why).
-The Feature Planner then turns stable requirements into plan > milestone > tasks
-(how). The Developer workflows implement tasks with full gate enforcement and
-annotate+tag linking new code to standards. Full lifecycle: Product Owner →
-Feature Planner → Backend/Frontend Developer.
+The Architect bridges requirements to architecture (plan mode) and implementation
+back to standards (review mode). The Feature Planner then turns stable
+architecture into plan > milestone > tasks (how). The Developer workflows
+implement tasks with full gate enforcement and annotate+tag linking new code to
+standards. Full lifecycle: Product Owner → Architect (plan) → Feature Planner →
+Backend/Frontend Developer → Architect (review).
 
-New features: Product Owner shapes requirements first → Feature Planner creates
+New features: Product Owner shapes requirements first → Architect (plan mode)
+establishes architecture and ensures standards coverage → Feature Planner creates
 plan > milestone > tasks → Marco approves → Marco triggers the matching
-Developer workflow per task. Implementation tasks MUST be handed off to the
-matching Developer workflow; do not implement backend or frontend code ad hoc.
+Developer workflow per task → Architect (review mode) audits code against plan
+intent and standards, runs `orkai review`, fixes gaps. Implementation tasks MUST
+be handed off to the matching Developer workflow; do not implement backend or
+frontend code ad hoc.
 
 ### Audit Workflow (lazy-load, not required onboarding)
 
