@@ -81,3 +81,110 @@ func TestMetrics_HandlerIncrementsCounters(t *testing.T) {
 		t.Fatalf("http_requests_total has no /ping label; metrics=%v", total.Metric)
 	}
 }
+
+func TestCORS_AllowsListedOrigin(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS("http://localhost:5173"))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want http://localhost:5173", got)
+	}
+}
+
+func TestCORS_OmitsOriginWhenNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS("http://localhost:5173"))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.Header.Set("Origin", "http://evil.com")
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}
+
+func TestCORS_HandlesPreflight(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS("http://localhost:5173"))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/ping", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want http://localhost:5173", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); got == "" {
+		t.Error("Access-Control-Allow-Methods is empty")
+	}
+}
+
+func TestCORS_NoOriginHeaderIsSafe(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS("http://localhost:5173"))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}
+
+func TestCORS_EmptyAllowedOrigins(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(CORS(""))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}

@@ -25,6 +25,8 @@ type Config struct {
 	LLMAPIKey string
 	// OutputDir is the directory where generated PDFs are written.
 	OutputDir string
+	// CORSAllowedOrigins is a comma-separated list of allowed CORS origins.
+	CORSAllowedOrigins string
 }
 
 // Load reads environment variables and returns a Config.
@@ -43,11 +45,12 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		Port:        port,
-		DBPath:      os.Getenv("DB_PATH"),
-		LLMProvider: os.Getenv("LLM_PROVIDER"),
-		LLMModel:    os.Getenv("LLM_MODEL"),
-		LLMAPIKey:   os.Getenv("LLM_API_KEY"),
-		OutputDir:   os.Getenv("OUTPUT_DIR"),
+		Port:               port,
+		DBPath:             os.Getenv("DB_PATH"),
+		LLMProvider:        os.Getenv("LLM_PROVIDER"),
+		LLMModel:           os.Getenv("LLM_MODEL"),
+		LLMAPIKey:          os.Getenv("LLM_API_KEY"),
+		OutputDir:          os.Getenv("OUTPUT_DIR"),
+		CORSAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
 	}, nil
 }
