@@ -2,10 +2,13 @@ package main
 
 import (
 	"embed"
+	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -87,7 +90,43 @@ func Run() error {
 }
 
 func main() {
+	serve, exit := resolveCommand(os.Args[1:])
+	if !serve {
+		if exit != 0 {
+			fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		}
+		printUsage()
+		if exit != 0 {
+			os.Exit(1)
+		}
+		return
+	}
 	if err := Run(); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
+}
+
+func resolveCommand(args []string) (serve bool, exit int) {
+	if len(args) == 0 || args[0] == "serve" {
+		return true, 0
+	}
+	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		return false, 0
+	}
+	return false, 1
+}
+
+func printUsage() {
+	printUsageTo(os.Stdout)
+}
+
+func printUsageTo(w io.Writer) {
+	fmt.Fprintln(w, `orkai-resume — a local-first resume builder
+
+Usage:
+  orkai-resume [command]
+
+Commands:
+  serve    Start the resume-app server (default)
+  help     Print this help message`)
 }

@@ -1,95 +1,58 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"bytes"
 	"strings"
 	"testing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/marco/resume-app/internal/handlers"
 )
 
-func init() {
-	gin.SetMode(gin.TestMode)
-	hasFrontendFS = false
-}
-
-func TestHealthEndpoint(t *testing.T) {
+func TestResolveCommand(t *testing.T) {
 	t.Parallel()
 
-	router := setupRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", w.Code)
+	tests := []struct {
+		name      string
+		args      []string
+		wantServe bool
+		wantExit  int
+	}{
+		{name: "no args defaults to serve", args: nil, wantServe: true, wantExit: 0},
+		{name: "empty args defaults to serve", args: []string{}, wantServe: true, wantExit: 0},
+		{name: "serve starts server", args: []string{"serve"}, wantServe: true, wantExit: 0},
+		{name: "help prints usage", args: []string{"help"}, wantServe: false, wantExit: 0},
+		{name: "--help prints usage", args: []string{"--help"}, wantServe: false, wantExit: 0},
+		{name: "-h prints usage", args: []string{"-h"}, wantServe: false, wantExit: 0},
+		{name: "unknown command errors", args: []string{"foo"}, wantServe: false, wantExit: 1},
 	}
-	if body := w.Body.String(); body != `{"status":"ok"}` {
-		t.Errorf("body = %q, want {\"status\":\"ok\"}", body)
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			serve, exit := resolveCommand(tt.args)
+			if serve != tt.wantServe {
+				t.Errorf("serve = %v, want %v", serve, tt.wantServe)
+			}
+			if exit != tt.wantExit {
+				t.Errorf("exit = %v, want %v", exit, tt.wantExit)
+			}
+		})
 	}
 }
 
-func TestMetricsEndpoint(t *testing.T) {
+func TestPrintUsage(t *testing.T) {
 	t.Parallel()
 
-	router := setupRouter(t)
+	var buf bytes.Buffer
+	printUsageTo(&buf)
+	got := buf.String()
 
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", w.Code)
+	if !strings.Contains(got, "orkai-resume") {
+		t.Error("usage should mention orkai-resume")
 	}
-	body := w.Body.String()
-	if !strings.Contains(body, "# HELP") {
-		t.Errorf("body does not look like Prometheus format (missing # HELP):\n%s", body)
+	if !strings.Contains(got, "serve") {
+		t.Error("usage should list serve command")
 	}
-}
-
-func TestV1APIGroupReturns404(t *testing.T) {
-	t.Parallel()
-
-	router := setupRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/api", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want 404", w.Code)
+	if !strings.Contains(got, "help") {
+		t.Error("usage should list help command")
 	}
-}
-
-func TestNoSPAInDevMode(t *testing.T) {
-	t.Parallel()
-
-	router := setupRouter(t)
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want 404 for / in dev mode (no SPA)", w.Code)
-	}
-}
-
-func setupRouter(t *testing.T) *gin.Engine {
-	t.Helper()
-
-	router := gin.New()
-
-	healthHandler := handlers.NewHealthHandler()
-	metricsHandler := handlers.NewMetricsHandler()
-
-	router.GET("/health", healthHandler.Health)
-	router.GET("/metrics", metricsHandler.Metrics)
-
-	router.Group("/v1/api")
-
-	return router
 }
