@@ -27,7 +27,7 @@ func TestRecovery_Returns500Envelope(t *testing.T) {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 	var env struct {
-		Data any `json:"data"`
+		Data  any `json:"data"`
 		Error *struct {
 			Code    string `json:"code"`
 			Message string `json:"message"`

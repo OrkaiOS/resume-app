@@ -11,7 +11,7 @@ func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				c.AbortWithStatusJSON(500, handlers.Failure("INTERNAL", "internal server error"))
+				c.AbortWithStatusJSON(500, handlers.Failure(handlers.ErrCodeInternal, "internal server error"))
 			}
 		}()
 		c.Next()
