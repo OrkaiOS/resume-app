@@ -6,7 +6,8 @@
 /bin/
 
 # SPA build output (embedded at build time)
-/cmd/static/
+/cmd/static/*
+!/cmd/static/.gitkeep
 
 # Local SQLite database
 *.db

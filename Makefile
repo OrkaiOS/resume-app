@@ -24,5 +24,5 @@ dev:
 
 clean:
 	rm -rf backend/bin
-	rm -rf backend/cmd/static
+	find backend/cmd/static -mindepth 1 -not -name .gitkeep -delete 2>/dev/null || true
 	rm -rf frontend/dist
