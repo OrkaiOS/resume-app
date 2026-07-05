@@ -1,0 +1,43 @@
+# lefthook.yml — git hooks for resume-app monorepo
+# Pre-commit: fast checks only (format, lint, vet)
+# Pre-push: full gates (build, test, typecheck)
+
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      glob: "backend/**/*.go"
+      run: gofmt -l {staged_files}
+      fail_text: "gofmt would reformat these files. Run 'gofmt -w' on them."
+    go-vet:
+      glob: "backend/**/*.go"
+      run: go vet ./...
+      fail_text: "go vet failed. Fix the reported issues."
+    oxlint:
+      glob: "frontend/**/*.{ts,tsx,js,jsx}"
+      run: npm run lint
+      fail_text: "oxlint failed. Fix the reported issues."
+
+pre-push:
+  parallel: true
+  commands:
+    go-test:
+      glob: "backend/**/*.go"
+      run: go test ./...
+      fail_text: "go test failed."
+    go-build:
+      glob: "backend/**/*.go"
+      run: go build ./...
+      fail_text: "go build failed."
+    tsc:
+      glob: "frontend/**/*.{ts,tsx}"
+      run: npm run typecheck
+      fail_text: "TypeScript typecheck failed."
+    vitest:
+      glob: "frontend/**/*.{ts,tsx}"
+      run: npm run test
+      fail_text: "vitest tests failed."
+    vite-build:
+      glob: "frontend/**/*.{ts,tsx}"
+      run: npm run build
+      fail_text: "vite build failed."

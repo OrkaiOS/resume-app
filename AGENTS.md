@@ -209,6 +209,20 @@ npm run build           # vite build
 
 Run these via the shell, never via the LLM. See the "Model Routing Strategy" standard in orkai.
 
+### Pre-commit & Pre-push Hooks
+
+Git hooks are managed by [lefthook](https://github.com/evilmartians/lefthook).
+Run `lefthook install` once to activate them.
+
+| Hook | Checks |
+|------|--------|
+| `pre-commit` | `gofmt -l`, `go vet` (backend); `oxlint` (frontend) |
+| `pre-push` | `go test`, `go build` (backend); `tsc`, `vitest`, `vite build` (frontend) |
+
+Pre-commit runs fast checks only (format, lint, vet). Pre-push runs the full
+gate suite (build, test, typecheck). Hooks only fire when matching files are
+staged (glob-scoped per `lefthook.yml`).
+
 ### Role Workflows (lazy-load, trigger on implementation tasks)
 
 Three project-scoped role workflows own planning and implementation work. Each
