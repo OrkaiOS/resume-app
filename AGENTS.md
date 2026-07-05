@@ -78,10 +78,10 @@ intentionally global — do NOT scope those.
 4. **Brief the user**: summarize (a) what the latest session did, (b) current
    project status and relevant decisions, and (c) the grouped open work from
    step 3. Then ask: *"Which task should we start? Backend Developer / Frontend
-   Developer / something else?"* If there is no open work, ask what Marco wants
-   to do. Do NOT auto-start implementation — Marco picks the task; the agent
-   loads the matching role workflow via `workflow(action: "get", id: ...)` and
-   follows it.
+   Developer / Product Owner / something else?"* If there is no open work,
+   ask what Marco wants to do. Do NOT auto-start implementation — Marco
+   picks the task; the agent loads the matching role workflow via
+   `workflow(action: "get", id: ...)` and follows it.
 
 If step 3 finds zero open plans/milestones/tasks, skip the grouped list and
 just brief + ask what Marco wants to do.
@@ -223,31 +223,31 @@ Pre-commit runs fast checks only (format, lint, vet). Pre-push runs the full
 gate suite (build, test, typecheck). Hooks only fire when matching files are
 staged (glob-scoped per `lefthook.yml`).
 
-### Role Workflows (lazy-load, trigger on implementation tasks)
+### Role Workflows (lazy-load, trigger on matching task or intent)
 
-Three project-scoped role workflows own planning and implementation work. Each
-enforces its own standards, skills, test practice, and deterministic gates.
-Load the full steps with `workflow(action: "get", id: ...)` only when a task
-matches the workflow's scope — do NOT load them during session startup or
-onboarding.
+Four project-scoped role workflows own the full product lifecycle: from
+requirements through planning to implementation. Each enforces its own
+standards, skills, test practice, and deterministic gates. Load the full steps
+with `workflow(action: "get", id: ...)` only when a task matches the
+workflow's scope — do NOT load them during session startup or onboarding.
 
 | Workflow | ID | Trigger | Gates |
 |----------|----|---------|-------|
+| Product Owner (resume-app) | `33e6b0c6-4603-4747-abd0-423ff16821f2` | Any requirements work: discovery, refinement, prioritization, validation. Owns `docs/requirement.md`. Shapes the product before planning begins. | INVEST quality, traceable acceptance criteria, consistent priorities |
 | Feature Planner (resume-app) | `f87a7d22-8429-459f-8196-63155021ae11` | Any new feature or significant change. Searches standards/skills/code, collects orkai entity IDs, drafts design, persists plan > milestone > tasks, updates `docs/plan/MASTER_PLAN.md`, presents for approval, STOP. | P4 plan persistence, task-body contract (standards IDs + role workflow per task) |
 | Backend Developer (resume-app) | `2840ff4a-179d-4551-b1d5-c39130533961` | Any implementation task touching `backend/**` (Go + Gin: handlers, services, models, middleware, store, cmd) | `go build`, `go vet`, `gofmt -l`, `go test` |
 | Frontend Developer (resume-app) | `6aee46f4-e39c-4f21-bcbc-3916a49dd464` | Any implementation task touching `frontend/**` (React + Vite + TS: components, pages, hooks, api, store, types, lib) | `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` |
 
-The Feature Planner enforces P4 on the planning side (every plan is persisted
-as plan > milestone > tasks in orkai before implementation begins, and each
-task body names its standards by orkai entity ID and which Developer workflow
-implements it). The Developer workflows enforce P4 on the receiving side
-(they reject work without a task). Both enforce the annotate+tag step linking
-new code to the relevant standards, and the P1/P6 reporting step.
+The Product Owner shapes the product in `docs/requirement.md` (what and why).
+The Feature Planner then turns stable requirements into plan > milestone > tasks
+(how). The Developer workflows implement tasks with full gate enforcement and
+annotate+tag linking new code to standards. Full lifecycle: Product Owner →
+Feature Planner → Backend/Frontend Developer.
 
-New features: run Feature Planner first → it creates plan > milestone > tasks
-→ Marco approves → Marco triggers the matching Developer workflow per task.
-Implementation tasks MUST be handed off to the matching Developer workflow;
-do not implement backend or frontend code ad hoc.
+New features: Product Owner shapes requirements first → Feature Planner creates
+plan > milestone > tasks → Marco approves → Marco triggers the matching
+Developer workflow per task. Implementation tasks MUST be handed off to the
+matching Developer workflow; do not implement backend or frontend code ad hoc.
 
 ### Audit Workflow (lazy-load, not required onboarding)
 
