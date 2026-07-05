@@ -216,7 +216,7 @@ Run `lefthook install` once to activate them.
 
 | Hook | Checks |
 |------|--------|
-| `pre-commit` | `gofmt -l`, `go vet` (backend); `oxlint` (frontend) |
+| `pre-commit` | `gofmt -l`, `go vet` (backend); `oxlint` (frontend); `orkai review` (all) |
 | `pre-push` | `go test`, `go build` (backend); `tsc`, `vitest`, `vite build` (frontend) |
 
 Pre-commit runs fast checks only (format, lint, vet). Pre-push runs the full

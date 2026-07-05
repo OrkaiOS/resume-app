@@ -1,5 +1,5 @@
 # lefthook.yml — git hooks for resume-app monorepo
-# Pre-commit: fast checks only (format, lint, vet)
+# Pre-commit: fast checks (format, lint, vet) + orkai review gate
 # Pre-push: full gates (build, test, typecheck)
 
 pre-commit:
@@ -17,6 +17,10 @@ pre-commit:
       glob: "frontend/**/*.{ts,tsx,js,jsx}"
       run: npm run lint
       fail_text: "oxlint failed. Fix the reported issues."
+    orkai-review:
+      glob: "*"
+      run: orkai review
+      fail_text: "orkai review failed. Address the findings before committing."
 
 pre-push:
   parallel: true
