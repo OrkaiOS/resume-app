@@ -15,6 +15,8 @@ import (
 	"github.com/marco/resume-app/internal/config"
 	"github.com/marco/resume-app/internal/handlers"
 	"github.com/marco/resume-app/internal/middleware"
+	"github.com/marco/resume-app/internal/services"
+	"github.com/marco/resume-app/internal/store"
 )
 
 func serveSPA(router *gin.Engine, f embed.FS) error {
@@ -58,6 +60,18 @@ func Run() error {
 		return err
 	}
 
+	db, err := store.InitDB(cfg.DBPath)
+	if err != nil {
+		return fmt.Errorf("cmd.Run: %w", err)
+	}
+	defer db.Close()
+
+	profileStore := store.NewSQLiteProfileStore(db)
+	opportunityStore := store.NewSQLiteOpportunityStore(db)
+
+	profileSvc := services.NewProfileService(profileStore)
+	opportunitySvc := services.NewOpportunityService(opportunityStore)
+
 	metrics := middleware.NewMetrics()
 
 	router := gin.New()
@@ -78,6 +92,18 @@ func Run() error {
 
 	orkaiHealth := handlers.NewOrkaiHealthHandler(cfg.OrkaiHealthURL)
 	v1.GET("/health/orkai", orkaiHealth.CheckHealth)
+
+	profileHandler := handlers.NewProfileHandler(profileSvc)
+	v1.GET("/profile", profileHandler.Get)
+	v1.PUT("/profile", profileHandler.Upsert)
+
+	opportunityHandler := handlers.NewOpportunityHandler(opportunitySvc)
+	v1.GET("/opportunities", opportunityHandler.List)
+	v1.POST("/opportunities", opportunityHandler.Create)
+	v1.GET("/opportunities/:id", opportunityHandler.Get)
+	v1.PUT("/opportunities/:id", opportunityHandler.Update)
+	v1.DELETE("/opportunities/:id", opportunityHandler.Delete)
+	v1.PUT("/opportunities/:id/archive", opportunityHandler.SetArchived)
 
 	if hasFrontendFS {
 		if err := serveSPA(router, prodFrontendFS); err != nil {
