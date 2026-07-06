@@ -205,3 +205,16 @@ export interface OrkaiSetupStatus {
   steps: OrkaiSetupStep[]
   completed: boolean
 }
+
+export interface OrkaiSetupResponse {
+  setupId: string
+}
+
+export interface OnboardingStatus {
+  onboarded: boolean
+  steps: {
+    llmConfig: boolean
+    profile: boolean
+    orkaiSetup: boolean
+  }
+}

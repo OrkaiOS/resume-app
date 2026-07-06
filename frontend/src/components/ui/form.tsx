@@ -39,7 +39,7 @@ interface UseFormFieldReturn {
   formItemId: string
   formDescriptionId: string
   formMessageId: string
-  error: unknown
+  error?: unknown
 }
 
 function useFormField(): UseFormFieldReturn {
