@@ -175,10 +175,13 @@ func TestInitDB_TableColumns(t *testing.T) {
 		{
 			table: "user_settings",
 			columns: []string{
-				"id", "onboarding_completed", "llm_provider", "llm_model",
-				"llm_api_key", "orkai_profile_category_id",
-				"orkai_standards_category_id", "orkai_skills_category_id",
-				"created_at", "updated_at",
+				"id", "llm_provider", "llm_model",
+				"llm_api_key", "orkai_category_id",
+				"canonical_profile_standard_id",
+				"cover_letter_principles_standard_id",
+				"pdf_pipeline_standard_id",
+				"pdf_generation_skill_id",
+				"onboarded_at", "created_at", "updated_at",
 			},
 		},
 	}

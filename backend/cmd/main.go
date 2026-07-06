@@ -71,12 +71,14 @@ func Run() error {
 	resumeStore := store.NewSQLiteResumeStore(db)
 	coverLetterStore := store.NewSQLiteCoverLetterStore(db)
 	artifactStore := store.NewSQLiteArtifactStore(db)
+	onboardingStore := store.NewSQLiteOnboardingStore(db)
 
 	profileSvc := services.NewProfileService(profileStore)
 	opportunitySvc := services.NewOpportunityService(opportunityStore)
 	resumeSvc := services.NewResumeService(resumeStore)
 	coverLetterSvc := services.NewCoverLetterService(coverLetterStore)
 	artifactSvc := services.NewArtifactService(artifactStore)
+	onboardingSvc := services.NewOnboardingService(onboardingStore)
 
 	metrics := middleware.NewMetrics()
 
@@ -124,6 +126,11 @@ func Run() error {
 	v1.POST("/tools/artifacts", artifactHandler.Create)
 	v1.GET("/tools/artifacts/:id", artifactHandler.Get)
 	v1.DELETE("/tools/artifacts/:id", artifactHandler.Delete)
+
+	onboardingHandler := handlers.NewOnboardingHandler(onboardingSvc)
+	v1.POST("/onboarding/llm-config", onboardingHandler.SaveLLMConfig)
+	v1.POST("/onboarding/profile", onboardingHandler.SaveProfile)
+	v1.GET("/onboarding/status", onboardingHandler.GetStatus)
 
 	if hasFrontendFS {
 		if err := serveSPA(router, prodFrontendFS); err != nil {
