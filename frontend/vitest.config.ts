@@ -9,5 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    env: {
+      VITE_API_BASE: '/v1/api',
+    },
   },
 })
