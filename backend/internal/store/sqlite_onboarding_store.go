@@ -21,7 +21,7 @@ func NewSQLiteOnboardingStore(db *sql.DB) *SQLiteOnboardingStore {
 
 func (s *SQLiteOnboardingStore) Get(ctx context.Context) (models.OnboardingState, error) {
 	var o models.OnboardingState
-	var onboardedAt, updatedAt string
+	var onboardedAt, updatedAt sql.NullString
 	var llmProvider, llmModel, llmAPIKey sql.NullString
 	var orkaiCategoryID, profileStdID, coverLetterStdID, pdfPipelineStdID, pdfSkillID sql.NullString
 
@@ -51,8 +51,12 @@ func (s *SQLiteOnboardingStore) Get(ctx context.Context) (models.OnboardingState
 	o.CoverLetterPrinciplesStandardID = coverLetterStdID.String
 	o.PDFPipelineStandardID = pdfPipelineStdID.String
 	o.PDFGenerationSkillID = pdfSkillID.String
-	o.OnboardedAt, _ = time.Parse(time.RFC3339, onboardedAt)
-	o.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	if onboardedAt.Valid {
+		o.OnboardedAt, _ = time.Parse(time.RFC3339, onboardedAt.String)
+	}
+	if updatedAt.Valid {
+		o.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt.String)
+	}
 
 	return o, nil
 }
