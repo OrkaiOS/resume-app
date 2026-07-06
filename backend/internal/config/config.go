@@ -8,6 +8,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -51,9 +52,18 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("config.Load: ORKAI_HEALTH_URL is required (set it to the orkai daemon health URL, e.g. http://localhost:18787/health)")
 	}
 
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return Config{}, fmt.Errorf("config.Load: cannot determine home directory for DB_PATH default: %w", err)
+		}
+		dbPath = filepath.Join(home, ".orkai-resume", "data.db")
+	}
+
 	return Config{
 		Port:               port,
-		DBPath:             os.Getenv("DB_PATH"),
+		DBPath:             dbPath,
 		LLMProvider:        os.Getenv("LLM_PROVIDER"),
 		LLMModel:           os.Getenv("LLM_MODEL"),
 		LLMAPIKey:          os.Getenv("LLM_API_KEY"),
