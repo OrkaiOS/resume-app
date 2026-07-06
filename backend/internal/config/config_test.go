@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -91,6 +93,25 @@ func TestLoad_SuccessReadsAllVars(t *testing.T) {
 	}
 	if cfg.OrkaiHealthURL != "http://localhost:18787/health" {
 		t.Errorf("OrkaiHealthURL = %q, want http://localhost:18787/health", cfg.OrkaiHealthURL)
+	}
+}
+
+func TestLoad_DBPathDefault(t *testing.T) {
+	t.Setenv("BACKEND_PORT", "8080")
+	t.Setenv("ORKAI_HEALTH_URL", "http://localhost:18787/health")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() unexpected error: %v", err)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir: %v", err)
+	}
+	expected := filepath.Join(home, ".orkai-resume", "data.db")
+	if cfg.DBPath != expected {
+		t.Errorf("DBPath = %q, want %q", cfg.DBPath, expected)
 	}
 }
 
