@@ -15,6 +15,7 @@ import (
 	"github.com/marco/resume-app/internal/config"
 	"github.com/marco/resume-app/internal/handlers"
 	"github.com/marco/resume-app/internal/middleware"
+	"github.com/marco/resume-app/internal/orkai"
 	"github.com/marco/resume-app/internal/services"
 	"github.com/marco/resume-app/internal/store"
 )
@@ -135,6 +136,12 @@ func Run() error {
 	v1.POST("/onboarding/llm-config", onboardingHandler.SaveLLMConfig)
 	v1.POST("/onboarding/profile", onboardingHandler.SaveProfile)
 	v1.GET("/onboarding/status", onboardingHandler.GetStatus)
+
+	orkaiClient := orkai.NewOrkaiClient(cfg.OrkaiMCPURL, cfg.OrkaiMCPToken)
+	orkaiSetupSvc := services.NewOrkaiSetupService(orkaiClient, onboardingStore)
+	orkaiSetupHandler := handlers.NewOrkaiSetupHandler(orkaiSetupSvc, profileSvc)
+	v1.POST("/onboarding/orkai-setup", orkaiSetupHandler.StartSetup)
+	v1.GET("/onboarding/orkai-setup/status", orkaiSetupHandler.GetStatus)
 
 	if hasFrontendFS {
 		if err := serveSPA(router, prodFrontendFS); err != nil {

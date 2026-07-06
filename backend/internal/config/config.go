@@ -30,6 +30,10 @@ type Config struct {
 	CORSAllowedOrigins string
 	// OrkaiHealthURL is the URL of the orkai daemon health endpoint (required).
 	OrkaiHealthURL string
+	// OrkaiMCPURL is the base URL of the orkai MCP API (default http://localhost:18787/mcp).
+	OrkaiMCPURL string
+	// OrkaiMCPToken is the auth token for the orkai MCP API (required for onboarding).
+	OrkaiMCPToken string
 }
 
 // Load reads environment variables and returns a Config.
@@ -61,6 +65,11 @@ func Load() (Config, error) {
 		dbPath = filepath.Join(home, ".orkai-resume", "data.db")
 	}
 
+	orkaiMCPURL := os.Getenv("ORKAI_MCP_URL")
+	if orkaiMCPURL == "" {
+		orkaiMCPURL = "http://localhost:18787/mcp"
+	}
+
 	return Config{
 		Port:               port,
 		DBPath:             dbPath,
@@ -70,5 +79,7 @@ func Load() (Config, error) {
 		OutputDir:          os.Getenv("OUTPUT_DIR"),
 		CORSAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
 		OrkaiHealthURL:     orkaiHealthURL,
+		OrkaiMCPURL:        orkaiMCPURL,
+		OrkaiMCPToken:      os.Getenv("ORKAI_MCP_TOKEN"),
 	}, nil
 }
