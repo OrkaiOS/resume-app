@@ -40,6 +40,7 @@ Multi-user, authentication, and cloud sync are explicitly out of scope.
 
 - orkai standards: Frontend React + Vite Conventions, Backend Go + Gin Conventions, API Contract Standard, Model Routing Strategy
 - AGENTS.md — project restrictions, build commands, branch policy, role workflows
+- assistant-ui (https://www.assistant-ui.com/llms.txt) — React component library for AI chat interfaces, used for the chat frontend (FR-030)
 
 ---
 
@@ -84,6 +85,7 @@ models, OpenAI, or Anthropic) configured during onboarding.
 - Built-in `/health` and `/metrics` endpoints
 - No authentication
 - orkai is a mandatory runtime dependency — the app does not function without it
+- Chat UI: assistant-ui React components with LocalRuntime, connected to the Go backend via a custom ChatModelAdapter. No Node.js backend required — assistant-ui is frontend-only.
 
 ---
 
@@ -330,6 +332,7 @@ Acceptance criteria:
 
 Acceptance criteria:
 - Chat UI includes: message history area, text input with send button, and a sidebar/header showing the current opportunity context
+- The chat UI is built with assistant-ui primitives (Thread, Composer, Message) styled with Tailwind CSS + shadcn/ui
 - Messages support markdown rendering (headings, lists, bold, italic, links)
 - The agent's responses stream incrementally (tokens appear as they are generated)
 - User can stop a streaming response
@@ -914,6 +917,7 @@ Database stores:
 | 0.1.0 | 2026-07-05 | — | Initial SRS draft — form-based resume builder |
 | 0.2.0 | 2026-07-05 | — | Complete rewrite — agentic chat-first architecture with orkai MCP integration |
 | 0.2.1 | 2026-07-05 | — | Refinement — expanded onboarding with 7 orkai entities, added cover letter writing rules (FR-036), added accepted document write-back to orkai (FR-037), specified pandoc+weasyprint PDF pipeline with CSS tuning, added authoritative profile source rule |
+| 0.2.2 | 2026-07-06 | — | Refinement — documented assistant-ui as the chat frontend framework (FR-030), added design constraint in §2.4, added reference in §1.4 |
 
 ### 6.2 Open Questions
 
