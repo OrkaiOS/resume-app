@@ -68,9 +68,13 @@ func Run() error {
 
 	profileStore := store.NewSQLiteProfileStore(db)
 	opportunityStore := store.NewSQLiteOpportunityStore(db)
+	resumeStore := store.NewSQLiteResumeStore(db)
+	coverLetterStore := store.NewSQLiteCoverLetterStore(db)
 
 	profileSvc := services.NewProfileService(profileStore)
 	opportunitySvc := services.NewOpportunityService(opportunityStore)
+	resumeSvc := services.NewResumeService(resumeStore)
+	coverLetterSvc := services.NewCoverLetterService(coverLetterStore)
 
 	metrics := middleware.NewMetrics()
 
@@ -104,6 +108,14 @@ func Run() error {
 	v1.PUT("/opportunities/:id", opportunityHandler.Update)
 	v1.DELETE("/opportunities/:id", opportunityHandler.Delete)
 	v1.PUT("/opportunities/:id/archive", opportunityHandler.SetArchived)
+
+	resumeHandler := handlers.NewResumeHandler(resumeSvc)
+	v1.GET("/opportunities/:id/resume", resumeHandler.GetByOpportunity)
+	v1.PUT("/opportunities/:id/resume", resumeHandler.Upsert)
+
+	coverLetterHandler := handlers.NewCoverLetterHandler(coverLetterSvc)
+	v1.GET("/opportunities/:id/cover-letter", coverLetterHandler.GetByOpportunity)
+	v1.PUT("/opportunities/:id/cover-letter", coverLetterHandler.Upsert)
 
 	if hasFrontendFS {
 		if err := serveSPA(router, prodFrontendFS); err != nil {
