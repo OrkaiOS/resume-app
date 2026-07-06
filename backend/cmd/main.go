@@ -101,6 +101,10 @@ func Run() error {
 	orkaiHealth := handlers.NewOrkaiHealthHandler(cfg.OrkaiHealthURL)
 	v1.GET("/health/orkai", orkaiHealth.CheckHealth)
 
+	profileParser := services.NewProfileParser()
+	profileUploadHandler := handlers.NewProfileUploadHandler(profileParser)
+	v1.POST("/profile/upload", profileUploadHandler.Upload)
+
 	profileHandler := handlers.NewProfileHandler(profileSvc)
 	v1.GET("/profile", profileHandler.Get)
 	v1.PUT("/profile", profileHandler.Upsert)
