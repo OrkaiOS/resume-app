@@ -1,12 +1,15 @@
 package services
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"strings"
 
+	"github.com/ledongthuc/pdf"
+	"github.com/marco/resume-app/internal/llm"
 	"github.com/marco/resume-app/internal/models"
 )
 
@@ -16,26 +19,35 @@ func NewProfileParser() *ProfileParser {
 	return &ProfileParser{}
 }
 
+type ProfileLLMParser struct{}
+
+func NewProfileLLMParser() *ProfileLLMParser {
+	return &ProfileLLMParser{}
+}
+
 func (p *ProfileParser) ParsePDF(r io.Reader) (*models.Profile, error) {
-	f, err := os.CreateTemp("", "resume-app-pdf-*.pdf")
+	data, err := io.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: %w", err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	if _, err := io.Copy(f, r); err != nil {
-		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: %w", err)
+		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: read: %w", err)
 	}
 
-	cmd := exec.Command("pdftotext", "-layout", f.Name(), "-")
-	out, err := cmd.Output()
+	pdfReader, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: pdftotext failed (is poppler installed?): %w", err)
+		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: open pdf: %w", err)
+	}
+
+	textReader, err := pdfReader.GetPlainText()
+	if err != nil {
+		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: extract text: %w", err)
+	}
+
+	text, err := io.ReadAll(textReader)
+	if err != nil {
+		return nil, fmt.Errorf("services.ProfileParser.ParsePDF: read text: %w", err)
 	}
 
 	profile := &models.Profile{
-		ProfessionalSummary: strings.TrimSpace(string(out)),
+		ProfessionalSummary: strings.TrimSpace(string(text)),
 	}
 
 	return profile, nil
@@ -477,4 +489,121 @@ func parseLanguages(content string) models.LanguageList {
 		result = append(result, l)
 	}
 	return result
+}
+
+const profileExtractionSystemPrompt = `You are a resume data extraction tool. Extract structured profile data from the provided resume text. Return ONLY a JSON object (no markdown fences, no explanations). Use the exact field names below.
+
+{
+  "fullName": "string",
+  "email": "string",
+  "phone": "string",
+  "location": "string",
+  "linkedinUrl": "string",
+  "websiteUrl": "string",
+  "githubUrl": "string",
+  "professionalSummary": "string",
+  "workExperience": [
+    {
+      "jobTitle": "string",
+      "company": "string",
+      "location": "string",
+      "startDate": "string (YYYY-MM or YYYY)",
+      "endDate": "string (YYYY-MM, YYYY, or 'Present')",
+      "description": "string"
+    }
+  ],
+  "education": [
+    {
+      "degree": "string",
+      "institution": "string",
+      "location": "string",
+      "startDate": "string",
+      "endDate": "string",
+      "gpa": "string"
+    }
+  ],
+  "skills": [
+    {
+      "name": "string (category, e.g. 'Languages', 'Frameworks', 'Tools')",
+      "skills": ["string"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "string",
+      "role": "string",
+      "description": "string",
+      "technologies": ["string"],
+      "url": "string"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "string",
+      "issuingOrg": "string",
+      "dateObtained": "string",
+      "expiryDate": "string",
+      "credentialUrl": "string"
+    }
+  ],
+  "languages": [
+    {
+      "name": "string (e.g. 'English', 'Spanish')",
+      "proficiency": "string (e.g. 'Native', 'Fluent', 'Intermediate')"
+    }
+  ]
+}
+
+Rules:
+- Only include fields that appear in the resume. Omit missing fields entirely.
+- Keep descriptions concise but complete.
+- Group skills into logical categories (Languages, Frameworks, Tools, Platforms, etc.).
+- If a section is absent, use an empty array [] for that field.
+- Return valid JSON only, no markdown fences.`
+
+func (p *ProfileLLMParser) Parse(ctx context.Context, text string, provider, model, apiKey string) (*models.Profile, error) {
+	if provider == "" || model == "" {
+		return nil, fmt.Errorf("services.ProfileLLMParser.Parse: LLM not configured (provider=%q model=%q)", provider, model)
+	}
+
+	client := llm.NewClient(provider, model, apiKey)
+	response, err := client.Chat(ctx, profileExtractionSystemPrompt, text)
+	if err != nil {
+		return nil, fmt.Errorf("services.ProfileLLMParser.Parse: llm call: %w", err)
+	}
+
+	jsonText := extractJSON(response)
+
+	var profile models.Profile
+	if err := json.Unmarshal([]byte(jsonText), &profile); err != nil {
+		return nil, fmt.Errorf("services.ProfileLLMParser.Parse: unmarshal JSON: %w", err)
+	}
+
+	return &profile, nil
+}
+
+func extractJSON(text string) string {
+	text = strings.TrimSpace(text)
+	if idx := strings.Index(text, "```json"); idx >= 0 {
+		start := idx + len("```json")
+		if end := strings.Index(text[start:], "```"); end >= 0 {
+			return strings.TrimSpace(text[start : start+end])
+		}
+	}
+	if idx := strings.Index(text, "```"); idx >= 0 {
+		start := idx + len("```")
+		if end := strings.Index(text[start:], "```"); end >= 0 {
+			candidate := strings.TrimSpace(text[start : start+end])
+			if strings.HasPrefix(candidate, "{") {
+				return candidate
+			}
+		}
+	}
+	if idx := strings.Index(text, "{"); idx >= 0 {
+		lastBrace := strings.LastIndex(text, "}")
+		if lastBrace > idx {
+			return text[idx : lastBrace+1]
+		}
+	}
+	return text
 }

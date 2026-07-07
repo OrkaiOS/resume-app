@@ -123,6 +123,14 @@ func (h *OrkaiSetupHandler) consumeProgress(sessionID string, ch <-chan services
 		h.mu.Unlock()
 		idx++
 	}
+	for i := idx; i < len(stepNames); i++ {
+		h.mu.Lock()
+		h.steps[sessionID][i] = services.SetupStep{
+			Name:   stepNames[i],
+			Status: "skipped",
+		}
+		h.mu.Unlock()
+	}
 }
 
 var stepNames = []string{

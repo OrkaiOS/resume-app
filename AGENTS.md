@@ -240,6 +240,7 @@ workflow's scope — do NOT load them during session startup or onboarding.
 | Feature Planner (resume-app) | `f87a7d22-8429-459f-8196-63155021ae11` | Any new feature or significant change. Searches standards/skills/code, collects orkai entity IDs, drafts design, persists plan > milestone > tasks, updates `docs/plan/MASTER_PLAN.md`, presents for approval, STOP. | P4 plan persistence, task-body contract (standards IDs + role workflow per task) |
 | Backend Developer (resume-app) | `2840ff4a-179d-4551-b1d5-c39130533961` | Any implementation task touching `backend/**` (Go + Gin: handlers, services, models, middleware, store, cmd) | `go build`, `go vet`, `gofmt -l`, `go test` |
 | Frontend Developer (resume-app) | `6aee46f4-e39c-4f21-bcbc-3916a49dd464` | Any implementation task touching `frontend/**` (React + Vite + TS: components, pages, hooks, api, store, types, lib) | `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` |
+| Frontend QA (resume-app) | `0fc856e1-9fe3-446b-a2de-6ad6319e08e5` | QA task created by Frontend Developer after implementation that introduces or modifies UI. Receives a precise test script (URLs, elements, interactions, assertions) and executes Playwright browser tests against the running dev environment. | Zero console errors, all elements render, all interactions produce expected outcomes, all ACs satisfied |
 
 The Product Owner shapes the product in `docs/requirement.md` (what and why).
 The Architect bridges requirements to architecture (plan mode) and implementation
@@ -247,7 +248,7 @@ back to standards (review mode). The Feature Planner then turns stable
 architecture into plan > milestone > tasks (how). The Developer workflows
 implement tasks with full gate enforcement and annotate+tag linking new code to
 standards. Full lifecycle: Product Owner → Architect (plan) → Feature Planner →
-Backend/Frontend Developer → Architect (review).
+Backend/Frontend Developer → Frontend QA (when UI changed) → Architect (review).
 
 New features: Product Owner shapes requirements first → Architect (plan mode)
 establishes architecture and ensures standards coverage → Feature Planner creates

@@ -1,53 +1,204 @@
 package orkai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const defaultRequestTimeout = 30 * time.Second
+const defaultRequestTimeout = 10 * time.Second
 
-type OrkaiClient struct {
-	baseURL string
-	token   string
-	client  *http.Client
+type rpcReply struct {
+	result json.RawMessage
+	err    error
 }
 
-func NewOrkaiClient(baseURL, token string) *OrkaiClient {
-	return &OrkaiClient{
-		baseURL: baseURL,
-		token:   token,
-		client: &http.Client{
-			Timeout: defaultRequestTimeout,
-		},
-	}
+type OrkaiClient struct {
+	sseURL    string
+	token     string
+	sseClient *http.Client
+	rpcClient *http.Client
+	requestID atomic.Int32
+	msgURL    string
+	pending   map[int32]chan rpcReply
+	done      chan struct{}
+	mu        sync.Mutex
+}
+
+type jsonRPCRequest struct {
+	JSONRPC string      `json:"jsonrpc"`
+	ID      int32       `json:"id"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params,omitempty"`
+}
+
+type jsonRPCResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      int32           `json:"id"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *jsonRPCError   `json:"error,omitempty"`
+}
+
+type jsonRPCError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type mcpContentItem struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type mcpToolResult struct {
+	Content []mcpContentItem `json:"content"`
 }
 
 type createResponse struct {
 	ID string `json:"id"`
 }
 
-func (c *OrkaiClient) CreateCategory(ctx context.Context, name string) (string, error) {
-	body := map[string]any{
-		"action":      "create",
-		"name":        name,
-		"description": "User's personal resume-app workspace",
+func NewOrkaiClient(sseURL, token string) *OrkaiClient {
+	return &OrkaiClient{
+		sseURL:    sseURL,
+		token:     token,
+		sseClient: &http.Client{Timeout: 0},
+		rpcClient: &http.Client{Timeout: defaultRequestTimeout},
+		pending:   make(map[int32]chan rpcReply),
+		done:      make(chan struct{}),
+	}
+}
+
+func (c *OrkaiClient) connect() error {
+	c.mu.Lock()
+	if c.msgURL != "" {
+		c.mu.Unlock()
+		return nil
+	}
+	c.mu.Unlock()
+
+	req, err := http.NewRequest(http.MethodGet, c.sseURL, nil)
+	if err != nil {
+		return fmt.Errorf("orkai.connect: new request: %w", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	resp, err := c.mcpCall(ctx, "categories", body)
+	resp, err := c.sseClient.Do(req)
 	if err != nil {
+		return fmt.Errorf("orkai.connect: GET %s: %w", c.sseURL, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return fmt.Errorf("orkai.connect: GET %s returned %d", c.sseURL, resp.StatusCode)
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	msgURL, err := readSSEEndpoint(reader)
+	if err != nil {
+		resp.Body.Close()
+		return fmt.Errorf("orkai.connect: %w", err)
+	}
+
+	c.mu.Lock()
+	c.msgURL = msgURL
+	c.mu.Unlock()
+
+	go c.readSSE(resp.Body, reader)
+	return nil
+}
+
+func readSSEEndpoint(reader *bufio.Reader) (string, error) {
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("read sse: %w", err)
+		}
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "data: ") {
+			data := strings.TrimPrefix(line, "data: ")
+			if strings.HasPrefix(data, "http://") || strings.HasPrefix(data, "https://") {
+				return data, nil
+			}
+		}
+	}
+}
+
+func (c *OrkaiClient) readSSE(body io.ReadCloser, reader *bufio.Reader) {
+	defer body.Close()
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			log.Printf("orkai.readSSE: connection closed: %v", err)
+			return
+		}
+		line = strings.TrimSpace(line)
+
+		if strings.HasPrefix(line, "data: ") {
+			data := strings.TrimPrefix(line, "data: ")
+			c.dispatchResponse(data)
+		}
+	}
+}
+
+func (c *OrkaiClient) dispatchResponse(data string) {
+	var rpcResp jsonRPCResponse
+	if err := json.Unmarshal([]byte(data), &rpcResp); err != nil {
+		return
+	}
+
+	c.mu.Lock()
+	ch, ok := c.pending[rpcResp.ID]
+	c.mu.Unlock()
+
+	if !ok {
+		return
+	}
+
+	if rpcResp.Error != nil {
+		select {
+		case ch <- rpcReply{err: fmt.Errorf("orkai rpc error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)}:
+		default:
+		}
+		return
+	}
+
+	select {
+	case ch <- rpcReply{result: rpcResp.Result}:
+	default:
+	}
+}
+
+func (c *OrkaiClient) CreateCategory(ctx context.Context, name string) (string, error) {
+	if err := c.connect(); err != nil {
 		return "", err
 	}
 
+	result, err := c.callTool(ctx, "categories", map[string]interface{}{
+		"action":      "create",
+		"name":        name,
+		"description": "User's personal resume-app workspace",
+	})
+	if err != nil {
+		return "", fmt.Errorf("orkai.CreateCategory: %w", err)
+	}
+
 	var r createResponse
-	if err := json.Unmarshal(resp, &r); err != nil {
+	if err := json.Unmarshal(result, &r); err != nil {
 		return "", fmt.Errorf("orkai.CreateCategory: parse response: %w", err)
 	}
 	if r.ID == "" {
@@ -58,20 +209,22 @@ func (c *OrkaiClient) CreateCategory(ctx context.Context, name string) (string, 
 }
 
 func (c *OrkaiClient) CreateStandard(ctx context.Context, name, text, categoryID string) (string, error) {
-	body := map[string]any{
+	if err := c.connect(); err != nil {
+		return "", err
+	}
+
+	result, err := c.callTool(ctx, "standards", map[string]interface{}{
 		"action":       "create",
 		"name":         name,
 		"text":         text,
 		"category_ids": []string{categoryID},
-	}
-
-	resp, err := c.mcpCall(ctx, "standards", body)
+	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("orkai.CreateStandard: %w", err)
 	}
 
 	var r createResponse
-	if err := json.Unmarshal(resp, &r); err != nil {
+	if err := json.Unmarshal(result, &r); err != nil {
 		return "", fmt.Errorf("orkai.CreateStandard: parse response: %w", err)
 	}
 	if r.ID == "" {
@@ -82,20 +235,22 @@ func (c *OrkaiClient) CreateStandard(ctx context.Context, name, text, categoryID
 }
 
 func (c *OrkaiClient) CreateSkill(ctx context.Context, name, text, categoryID string) (string, error) {
-	body := map[string]any{
+	if err := c.connect(); err != nil {
+		return "", err
+	}
+
+	result, err := c.callTool(ctx, "skills", map[string]interface{}{
 		"action":       "create",
 		"name":         name,
 		"text":         text,
 		"category_ids": []string{categoryID},
-	}
-
-	resp, err := c.mcpCall(ctx, "skills", body)
+	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("orkai.CreateSkill: %w", err)
 	}
 
 	var r createResponse
-	if err := json.Unmarshal(resp, &r); err != nil {
+	if err := json.Unmarshal(result, &r); err != nil {
 		return "", fmt.Errorf("orkai.CreateSkill: parse response: %w", err)
 	}
 	if r.ID == "" {
@@ -106,54 +261,104 @@ func (c *OrkaiClient) CreateSkill(ctx context.Context, name, text, categoryID st
 }
 
 func (c *OrkaiClient) LinkEntities(ctx context.Context, sourceID, targetID string) error {
-	body := map[string]any{
+	if err := c.connect(); err != nil {
+		return err
+	}
+
+	_, err := c.callTool(ctx, "entity", map[string]interface{}{
 		"action": "update",
 		"id":     sourceID,
 		"relations": []map[string]string{
 			{"type": "references", "targetId": targetID},
 		},
-	}
-
-	_, err := c.mcpCall(ctx, "entity", body)
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("orkai.LinkEntities: %w", err)
 	}
 
 	return nil
 }
 
-func (c *OrkaiClient) mcpCall(ctx context.Context, tool string, body map[string]any) ([]byte, error) {
-	bodyJSON, err := json.Marshal(body)
+func (c *OrkaiClient) callTool(ctx context.Context, toolName string, args map[string]interface{}) (json.RawMessage, error) {
+	resp, err := c.rpcCall(ctx, "tools/call", map[string]interface{}{
+		"name":      toolName,
+		"arguments": args,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("orkai.mcpCall: marshal body: %w", err)
+		return nil, err
 	}
 
-	url := c.baseURL + "/" + tool
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyJSON))
-	if err != nil {
-		return nil, fmt.Errorf("orkai.mcpCall: %w", err)
+	var result mcpToolResult
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("orkai.callTool: parse tool result: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+
+	if len(result.Content) == 0 {
+		return nil, fmt.Errorf("orkai.callTool: empty tool result")
+	}
+
+	return json.RawMessage(result.Content[0].Text), nil
+}
+
+func (c *OrkaiClient) rpcCall(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
+	id := c.requestID.Add(1)
+
+	req := jsonRPCRequest{
+		JSONRPC: "2.0",
+		ID:      id,
+		Method:  method,
+		Params:  params,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("orkai.rpcCall: marshal: %w", err)
+	}
+
+	c.mu.Lock()
+	msgURL := c.msgURL
+	c.mu.Unlock()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, msgURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("orkai.rpcCall: new request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+		httpReq.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	resp, err := c.client.Do(req)
+	respCh := make(chan rpcReply, 1)
+	c.mu.Lock()
+	c.pending[id] = respCh
+	c.mu.Unlock()
+
+	defer func() {
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
+	}()
+
+	resp, err := c.rpcClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("orkai.mcpCall: %w", err)
+		return nil, fmt.Errorf("orkai.rpcCall: do: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("orkai.mcpCall: read response: %w", err)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("orkai.mcpCall: %s returned %d: %s", tool, resp.StatusCode, string(respBody))
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("orkai.rpcCall: %s returned %d: %s", method, resp.StatusCode, string(respBody))
 	}
 
-	return respBody, nil
+	select {
+	case reply := <-respCh:
+		if reply.err != nil {
+			return nil, fmt.Errorf("orkai.rpcCall: %w", reply.err)
+		}
+		return reply.result, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 func DetectMCPToken() (string, error) {
@@ -178,7 +383,7 @@ func DetectMCPToken() (string, error) {
 			continue
 		}
 
-		var cfg map[string]any
+		var cfg map[string]interface{}
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			continue
 		}
@@ -191,24 +396,24 @@ func DetectMCPToken() (string, error) {
 	return "", fmt.Errorf("orkai.DetectMCPToken: no ORKAI_MCP_TOKEN found in env or config files (%v)", paths)
 }
 
-func extractToken(cfg map[string]any) string {
+func extractToken(cfg map[string]interface{}) string {
 	if t, ok := cfg["ORKAI_MCP_TOKEN"].(string); ok && t != "" {
 		return t
 	}
 
-	servers, _ := cfg["mcpServers"].(map[string]any)
+	servers, _ := cfg["mcpServers"].(map[string]interface{})
 	for _, srv := range servers {
-		srvMap, _ := srv.(map[string]any)
-		env, _ := srvMap["env"].(map[string]any)
+		srvMap, _ := srv.(map[string]interface{})
+		env, _ := srvMap["env"].(map[string]interface{})
 		if env != nil {
 			if t, ok := env["ORKAI_MCP_TOKEN"].(string); ok && t != "" {
 				return t
 			}
 		}
-		headers, _ := srvMap["headers"].(map[string]any)
+		headers, _ := srvMap["headers"].(map[string]interface{})
 		if headers != nil {
-			if t, ok := headers["Authorization"].(string); ok && len(t) > 7 {
-				return t[7:] // strip "Bearer " prefix
+			if t, ok := headers["Authorization"].(string); ok && t != "" {
+				return strings.TrimPrefix(t, "Bearer ")
 			}
 		}
 	}

@@ -6,10 +6,20 @@ import {
   type FieldValues,
   FormProvider,
   useFormContext,
+  type UseFormReturn,
 } from "react-hook-form"
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
+
+function Form<TFieldValues extends FieldValues>({
+  children,
+  ...props
+}: {
+  children: React.ReactNode
+} & UseFormReturn<TFieldValues>) {
+  return <FormProvider {...props}>{children}</FormProvider>
+}
 
 interface FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
@@ -167,6 +177,7 @@ function FormMessage({ className, children, ...props }: FormMessageProps) {
 
 export {
   useFormField,
+  Form,
   FormProvider,
   FormItem,
   FormLabel,
