@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import {
+  Form,
   FormField,
   FormItem,
   FormLabel,
@@ -89,7 +90,9 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
   const workExperienceArray = useFieldArray({ control: form.control, name: "workExperience" })
   const educationArray = useFieldArray({ control: form.control, name: "education" })
   const skillsArray = useFieldArray({ control: form.control, name: "skills" })
+  const { update: updateSkills } = skillsArray
   const projectsArray = useFieldArray({ control: form.control, name: "projects" })
+  const { update: updateProjects } = projectsArray
   const certificationsArray = useFieldArray({ control: form.control, name: "certifications" })
   const languagesArray = useFieldArray({ control: form.control, name: "languages" })
 
@@ -208,6 +211,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
       )}
 
       {activeTab === "manual" && (
+        <Form {...form}>
         <form onChange={handleChange} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-foreground">Personal Info</h3>
@@ -618,7 +622,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                   index={index}
                   skills={field.skills}
                   onChange={(skills) => {
-                    form.setValue(`skills.${index}.skills`, skills)
+                    updateSkills(index, { ...field, skills })
                     handleChange()
                   }}
                 />
@@ -721,7 +725,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                     index={index}
                     technologies={field.technologies}
                     onChange={(technologies) => {
-                      form.setValue(`projects.${index}.technologies`, technologies)
+                      updateProjects(index, { ...field, technologies })
                       handleChange()
                     }}
                   />
@@ -904,6 +908,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             )}
           </Button>
         </form>
+        </Form>
       )}
     </div>
   )

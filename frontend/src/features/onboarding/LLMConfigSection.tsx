@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Form,
   FormField,
   FormItem,
   FormLabel,
@@ -42,12 +43,17 @@ function LLMConfigSection({ onComplete }: LLMConfigSectionProps) {
 
   function onSubmit(values: LLMConfigFormValues) {
     saveLLMConfig.mutate(values, {
-      onSuccess: () => onComplete(),
+      onSuccess: (res) => {
+        if (!res.error) {
+          onComplete()
+        }
+      },
     })
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
       <FormField
         control={form.control}
         name="provider"
@@ -112,6 +118,7 @@ function LLMConfigSection({ onComplete }: LLMConfigSectionProps) {
         )}
       </Button>
     </form>
+    </Form>
   )
 }
 
