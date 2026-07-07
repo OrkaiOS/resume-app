@@ -10,7 +10,7 @@ import HomePage from "@/pages/HomePage"
 
 const ChatPage = lazy(() => import("@/pages/ChatPage"))
 
-const isChatRoute = () => window.location.search.includes("chat=")
+const isChatRoute = () => window.location.search.includes("chat")
 
 function AppContent() {
   const { isOrkaiRunning } = useOrkaiHealth()

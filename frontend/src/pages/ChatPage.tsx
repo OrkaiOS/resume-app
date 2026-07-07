@@ -8,17 +8,18 @@ interface ChatPageProps {}
 
 function ChatPage(_props: ChatPageProps) {
   const params = new URLSearchParams(window.location.search)
-  const opportunityId = params.get("chat")
+  const hasChat = params.has("chat")
+  const opportunityId = params.get("chat") || null
   const { data: opportunity } = useOpportunity(opportunityId)
 
-  if (!opportunityId) {
+  if (!hasChat) {
     window.location.search = ""
     return null
   }
 
   const contextMessage = opportunity
     ? `You are helping the user create a tailored resume and cover letter for a job opportunity at ${opportunity.company} for the role of ${opportunity.role}. The opportunity was created on ${new Date(opportunity.createdAt).toLocaleDateString()}.`
-    : undefined
+    : "You are helping the user create a tailored resume and cover letter. Ask the user about the company and role they are applying to."
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -26,7 +27,7 @@ function ChatPage(_props: ChatPageProps) {
         <Building2 className="size-5 text-muted-foreground" />
         <div>
           <h1 className="text-sm font-semibold">
-            {opportunity ? `${opportunity.company} — ${opportunity.role}` : "Loading..."}
+            {opportunity ? `${opportunity.company} — ${opportunity.role}` : "New Conversation"}
           </h1>
           <p className="text-xs text-muted-foreground">Chat Agent</p>
         </div>

@@ -1,5 +1,4 @@
 import { FileText, Sparkles } from "lucide-react"
-import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { S } from "@/lib/strings"
@@ -7,10 +6,10 @@ import { S } from "@/lib/strings"
 // @orkai:ref(id=2cf97580-172f-410d-81b4-edb7e177a7b3)
 // @orkai:ref(id=6e959cda-9e4a-4c44-b87e-4c43deea936f)
 // @orkai:ref(id=5759c69e-7fc5-4e0c-8e9e-554fd4388492)
-// @orkai:decision "Start Chat" shows a toast until FR-030 (Chat) ships; visual AC of FR-021 (prominent button) is met, navigation AC is deferred to the chat slice
+// @orkai:decision "Start Chat" navigates to chat without an opportunity — the agent creates one during conversation per FR-051.
 function EmptyState() {
   function handleStartChat() {
-    toast.info(S.toast.chatComingSoon)
+    window.location.search = "?chat"
   }
 
   return (
