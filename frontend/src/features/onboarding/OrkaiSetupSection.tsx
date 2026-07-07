@@ -41,13 +41,13 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
   const [setupStarted, setSetupStarted] = useState(false)
 
   const triggerSetup = useTriggerOrkaiSetup()
-  const { data: setupStatus } = useOrkaiSetupStatus(setupId ?? "", setupStarted)
+  const { data: setupStatus, isLoading } = useOrkaiSetupStatus(setupId ?? "", setupStarted)
 
   function handleStart() {
     triggerSetup.mutate(undefined, {
       onSuccess: (res) => {
         if (res.data) {
-          setSetupId(res.data.setupId)
+          setSetupId(res.data.sessionId)
           setSetupStarted(true)
         }
       },
@@ -79,15 +79,21 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
           {triggerSetup.isPending ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
-              Starting...
+              Connecting to orkai...
             </>
           ) : (
             "Start Setup"
           )}
         </Button>
+        {triggerSetup.isError && (
+          <p className="text-sm text-destructive">
+            Could not connect to orkai. Check that the daemon is running and try
+            again.
+          </p>
+        )}
         {disabled && (
           <p className="text-xs text-muted-foreground">
-            Complete LLM Config and Profile steps first.
+            Complete the previous steps before setting up orkai.
           </p>
         )}
       </div>
@@ -104,33 +110,50 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
       </div>
 
       <div className="space-y-1.5">
-        {SETUP_STEPS.map((stepName, index) => {
+        {isLoading ? (
+          <div className="flex items-center gap-3 py-4">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              Initializing setup...
+            </span>
+          </div>
+        ) : steps.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">
+            Setup steps are being prepared. This creates standards, skills, and
+            documents in your orkai workspace.
+          </p>
+        ) : (
+          SETUP_STEPS.map((stepName, index) => {
           const step = steps[index]
           const status = step?.status ?? "pending"
+          const error = step?.error
 
           return (
-            <div
-              key={stepName}
-              className="flex items-center gap-3 rounded-md px-3 py-2"
-            >
-              {stepStatusIcon(status)}
-              <span className="flex-1 text-sm text-foreground">{stepName}</span>
-              <Badge
-                variant={
-                  status === "success"
-                    ? "default"
-                    : status === "failed"
-                      ? "destructive"
-                      : status === "in_progress"
-                        ? "secondary"
-                        : "outline"
-                }
-              >
-                {status === "in_progress" ? "In Progress" : status}
-              </Badge>
+            <div key={stepName}>
+              <div className="flex items-center gap-3 rounded-md px-3 py-2">
+                {stepStatusIcon(status)}
+                <span className="flex-1 text-sm text-foreground">{stepName}</span>
+                <Badge
+                  variant={
+                    status === "success"
+                      ? "default"
+                      : status === "failed"
+                        ? "destructive"
+                        : status === "in_progress"
+                          ? "secondary"
+                          : "outline"
+                  }
+                >
+                  {status === "in_progress" ? "In Progress" : status}
+                </Badge>
+              </div>
+              {status === "failed" && error && (
+                <p className="ml-10 text-xs text-destructive">{error}</p>
+              )}
             </div>
           )
-        })}
+          })
+        )}
       </div>
 
       {isComplete && (
@@ -140,14 +163,19 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
       )}
 
       {!isComplete && steps.some((s) => s.status === "failed") && (
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={handleRetry}
-        >
-          <RotateCcw className="mr-2 size-4" />
-          Retry Setup
-        </Button>
+        <div className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleRetry}
+          >
+            <RotateCcw className="mr-2 size-4" />
+            Retry Setup
+          </Button>
+          <Button variant="ghost" className="w-full" onClick={onComplete}>
+            Skip and continue
+          </Button>
+        </div>
       )}
     </div>
   )
