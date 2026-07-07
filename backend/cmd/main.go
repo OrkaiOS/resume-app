@@ -55,6 +55,8 @@ func serveSPA(router *gin.Engine, f embed.FS) error {
 	return nil
 }
 
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision Browser auto-open is gated on hasFrontendFS (prod build only); make dev uses Vite which owns the frontend, so no auto-open there. Headless env (SSH/DOCKER/no DISPLAY) skips silently.
 func Run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -148,6 +150,8 @@ func Run() error {
 		if err := serveSPA(router, prodFrontendFS); err != nil {
 			return err
 		}
+		appURL := "http://localhost:" + cfg.Port
+		go waitAndOpenBrowser(cfg.Port, appURL)
 	}
 
 	log.Printf("resume-app server listening on :%s", cfg.Port)

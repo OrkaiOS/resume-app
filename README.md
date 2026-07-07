@@ -125,6 +125,10 @@ go build ./...
 go run cmd/main.go
 ```
 
+In production mode (`make run` / `orkai-resume serve`), the browser opens
+automatically to the app once the server is ready. In `make dev`, Vite owns
+the frontend and no auto-open fires — see [Development](#development).
+
 ### Frontend
 
 ```bash
