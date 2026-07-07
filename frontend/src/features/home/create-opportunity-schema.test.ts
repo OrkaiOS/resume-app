@@ -11,24 +11,21 @@ describe("createOpportunitySchema", () => {
     expect(result.success).toBe(true)
   })
 
-  it("accepts a valid opportunity with empty description", () => {
+  it("rejects when description is empty", () => {
     const result = createOpportunitySchema.safeParse({
       company: "Acme",
       role: "Backend Developer",
       description: "",
     })
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(false)
   })
 
-  it("accepts a valid opportunity with missing description (defaults)", () => {
+  it("rejects when description is missing", () => {
     const result = createOpportunitySchema.safeParse({
       company: "Acme",
       role: "Backend Developer",
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.description).toBe("")
-    }
+    expect(result.success).toBe(false)
   })
 
   it("rejects when company is missing", () => {

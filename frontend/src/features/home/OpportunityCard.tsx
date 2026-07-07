@@ -33,7 +33,12 @@ function OpportunityCard({ opportunity }: OpportunityCardProps) {
         <CardTitle className="text-base">{opportunity.company}</CardTitle>
         <CardDescription>{opportunity.role}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-2">
+        {opportunity.description && (
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground line-clamp-4">
+            {opportunity.description}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {formatDate(opportunity.createdAt) || "—"}
         </p>
