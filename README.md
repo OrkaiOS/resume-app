@@ -112,6 +112,7 @@ resume-app/
 
 - Go 1.22+
 - Node.js 20+
+- [air](https://github.com/air-verse/air) for backend live reload during `make dev` — install once: `go install github.com/air-verse/air@latest`
 - One of: [Ollama](https://ollama.com/), an OpenAI API key, or an Anthropic API key
 
 ### Backend
@@ -137,6 +138,17 @@ npm run dev
 Open http://localhost:5173.
 
 ## Development
+
+### `make dev`
+
+Runs the full dev environment with hot reload on both surfaces:
+
+- **Frontend**: Vite dev server with HMR (http://localhost:5173)
+- **Backend**: [air](https://github.com/air-verse/air) watches `backend/**/*.go` and rebuilds + restarts the Go server on every save (http://localhost:8080)
+
+Requires `air` in PATH — see [Prerequisites](#prerequisites). The Vite dev
+server proxies `/v1/api` and `/health` to the backend, so the frontend talks
+to the live-reloaded Go server with no CORS setup.
 
 ### Build & test
 
