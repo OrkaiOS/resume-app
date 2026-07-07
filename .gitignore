@@ -16,6 +16,7 @@ bin/
 resume-app
 /resume-app
 backend/resume-app
+backend/tmp/
 
 # Database files
 *.db

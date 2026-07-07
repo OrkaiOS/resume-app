@@ -16,10 +16,16 @@ install: build
 		cp backend/bin/resume-app /usr/local/bin/orkai-resume; \
 	fi
 
+# @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+# @orkai:decision air replaces go run for FR-005 live reload; air is dev-only (not in go.mod), inherits env so config.Load + /health + /metrics stay intact
 dev:
+	@command -v air >/dev/null 2>&1 || { \
+		echo "air not found. Install: go install github.com/air-verse/air@latest"; \
+		exit 1; \
+	}
 	@trap 'kill 0' INT TERM; \
 	(cd frontend && npm run dev) & \
-	(cd backend && go run ./cmd) & \
+	(cd backend && air) & \
 	wait
 
 clean:
