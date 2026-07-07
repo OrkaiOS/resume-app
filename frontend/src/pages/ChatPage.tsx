@@ -49,12 +49,16 @@ function ChatPage(_props: ChatPageProps) {
     <div className="flex h-screen flex-col bg-background">
       <header className="flex items-center gap-3 border-b px-6 py-3">
         <Building2 className="size-5 text-muted-foreground" />
-        <div>
+        <div className="flex-1">
           <h1 className="text-sm font-semibold">
             {opportunity ? `${opportunity.company} — ${opportunity.role}` : "New Conversation"}
           </h1>
           <p className="text-xs text-muted-foreground">Chat Agent</p>
         </div>
+        <a href="/" className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <ArrowLeft className="size-3.5" />
+          Home
+        </a>
       </header>
       <div className="flex-1 overflow-hidden">
         <TooltipProvider>
