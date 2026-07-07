@@ -45,10 +45,6 @@ function ChatPage(_props: ChatPageProps) {
     )
   }
 
-  const contextMessage = opportunity
-    ? `You are helping the user create a tailored resume and cover letter for a job opportunity at ${opportunity.company} for the role of ${opportunity.role}. The opportunity was created on ${new Date(opportunity.createdAt).toLocaleDateString()}.`
-    : "You are helping the user create a tailored resume and cover letter. Ask the user about the company and role they are applying to."
-
   return (
     <div className="flex h-screen flex-col bg-background">
       <header className="flex items-center gap-3 border-b px-6 py-3">
@@ -62,7 +58,7 @@ function ChatPage(_props: ChatPageProps) {
       </header>
       <div className="flex-1 overflow-hidden">
         <TooltipProvider>
-          <ChatRuntimeProvider contextMessage={contextMessage}>
+          <ChatRuntimeProvider opportunityId={opportunityId}>
             <Thread />
           </ChatRuntimeProvider>
         </TooltipProvider>

@@ -3,27 +3,19 @@ import {
   AssistantRuntimeProvider,
   useLocalRuntime,
 } from "@assistant-ui/react"
-import { chatAdapter } from "@/components/chat/ChatAdapter"
+import { createChatAdapter } from "@/components/chat/ChatAdapter"
 
 interface ChatRuntimeProviderProps {
   children: ReactNode
-  contextMessage?: string
+  opportunityId: string | null
 }
 
 export function ChatRuntimeProvider({
   children,
-  contextMessage,
+  opportunityId,
 }: ChatRuntimeProviderProps) {
-  const runtime = useLocalRuntime(chatAdapter, {
-    initialMessages: contextMessage
-      ? [
-          {
-            role: "system",
-            content: [{ type: "text" as const, text: contextMessage }],
-          },
-        ]
-      : undefined,
-  })
+  const adapter = createChatAdapter(opportunityId)
+  const runtime = useLocalRuntime(adapter)
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
