@@ -38,6 +38,12 @@ func (e *errorStreamLLM) Stream(ctx context.Context, systemPrompt string, messag
 	return context.Canceled
 }
 
+type fakePromptBuilder struct{}
+
+func (f *fakePromptBuilder) Build(ctx context.Context, opportunityID string) string {
+	return "You are a helpful AI assistant."
+}
+
 func TestChatHandlerStream(t *testing.T) {
 	t.Parallel()
 
@@ -47,7 +53,7 @@ func TestChatHandlerStream(t *testing.T) {
 		t.Parallel()
 
 		fake := &fakeStreamLLM{tokens: []string{"Hel", "lo", "!"}}
-		handler := NewChatHandler(fake)
+		handler := NewChatHandler(fake, &fakePromptBuilder{})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -79,7 +85,7 @@ func TestChatHandlerStream(t *testing.T) {
 		t.Parallel()
 
 		fake := &fakeStreamLLM{tokens: []string{}}
-		handler := NewChatHandler(fake)
+		handler := NewChatHandler(fake, &fakePromptBuilder{})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -101,7 +107,7 @@ func TestChatHandlerStream(t *testing.T) {
 		c.Request = httptest.NewRequest(http.MethodPost, "/v1/api/chat", strings.NewReader(`{"messages":[{"role":"user","content":"Hi"}]}`))
 		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler := &ChatHandler{client: &errorStreamLLM{}}
+		handler := &ChatHandler{client: &errorStreamLLM{}, promptBuilder: &fakePromptBuilder{}}
 		handler.Stream(c)
 
 		if !strings.Contains(w.Body.String(), `"error":`) {

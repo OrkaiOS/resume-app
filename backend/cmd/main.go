@@ -148,8 +148,10 @@ func Run() error {
 	v1.POST("/onboarding/orkai-setup", orkaiSetupHandler.StartSetup)
 	v1.GET("/onboarding/orkai-setup/status", orkaiSetupHandler.GetStatus)
 
+	systemPromptSvc := services.NewSystemPromptService(onboardingStore, profileStore, opportunityStore, orkaiClient)
+
 	llmClient := createLLMClient(cfg, onboardingStore)
-	chatHandler := handlers.NewChatHandler(llmClient)
+	chatHandler := handlers.NewChatHandler(llmClient, systemPromptSvc)
 	v1.POST("/chat", chatHandler.Stream)
 
 	if hasFrontendFS {

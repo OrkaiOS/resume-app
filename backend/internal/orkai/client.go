@@ -260,6 +260,39 @@ func (c *OrkaiClient) CreateSkill(ctx context.Context, name, text, categoryID st
 	return r.ID, nil
 }
 
+type EntityResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision GetEntity fetches an orkai entity by ID at runtime using the MCP entity tool. Used by SystemPromptService to read profile standards and skills for chat session context.
+func (c *OrkaiClient) GetEntity(ctx context.Context, id string) (EntityResponse, error) {
+	if err := c.connect(); err != nil {
+		return EntityResponse{}, err
+	}
+
+	result, err := c.callTool(ctx, "entity", map[string]interface{}{
+		"action": "get",
+		"id":     id,
+	})
+	if err != nil {
+		return EntityResponse{}, fmt.Errorf("orkai.GetEntity: %w", err)
+	}
+
+	var r EntityResponse
+	if err := json.Unmarshal(result, &r); err != nil {
+		return EntityResponse{}, fmt.Errorf("orkai.GetEntity: parse response: %w", err)
+	}
+	if r.ID == "" {
+		return EntityResponse{}, fmt.Errorf("orkai.GetEntity: response missing id")
+	}
+
+	return r, nil
+}
+
 func (c *OrkaiClient) LinkEntities(ctx context.Context, sourceID, targetID string) error {
 	if err := c.connect(); err != nil {
 		return err

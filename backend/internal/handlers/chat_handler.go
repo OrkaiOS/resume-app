@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,17 +12,23 @@ import (
 
 // @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
 // @orkai:ref(id=61ce6f49-1307-4a1e-8ecf-9c49ce906520)
-// @orkai:decision SSE streaming with text/event-stream for FR-030 Chat Interface. Each token chunk is emitted as a JSON event. System prompt is a placeholder until FR-031 wires the orkai profile standard.
-type ChatHandler struct {
-	client llm.Client
+// @orkai:decision SSE streaming with text/event-stream for FR-030 Chat Interface. Each token chunk is emitted as a JSON event. System prompt is assembled server-side by SystemPromptService from orkai standards + profile + opportunity context per FR-031.
+type SystemPromptBuilder interface {
+	Build(ctx context.Context, opportunityID string) string
 }
 
-func NewChatHandler(client llm.Client) *ChatHandler {
-	return &ChatHandler{client: client}
+type ChatHandler struct {
+	client        llm.Client
+	promptBuilder SystemPromptBuilder
+}
+
+func NewChatHandler(client llm.Client, promptBuilder SystemPromptBuilder) *ChatHandler {
+	return &ChatHandler{client: client, promptBuilder: promptBuilder}
 }
 
 type chatRequest struct {
-	Messages []chatMessage `json:"messages" binding:"required"`
+	Messages      []chatMessage `json:"messages" binding:"required"`
+	OpportunityID string        `json:"opportunityId"`
 }
 
 type chatMessage struct {
@@ -52,7 +59,7 @@ func (h *ChatHandler) Stream(c *gin.Context) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 
-	systemPrompt := "You are a helpful AI assistant helping the user create tailored resumes and cover letters."
+	systemPrompt := h.promptBuilder.Build(c.Request.Context(), req.OpportunityID)
 
 	ctx := c.Request.Context()
 	err := h.client.Stream(ctx, systemPrompt, messages, func(token string) error {
