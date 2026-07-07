@@ -32,6 +32,11 @@
     "errorRetry": "Retry",
     "errorDescription": "Something went wrong. Please try again.",
     "title": "Your Opportunities",
-    "subtitle": "Track and tailor applications for each role."
+    "subtitle": "Track and tailor applications for each role.",
+    "deleteOpportunity": "Delete opportunity",
+    "confirmDelete": "Delete?",
+    "deleteConfirm": "Delete",
+    "resumeLabel": "Resume",
+    "coverLetterLabel": "Cover Letter"
   }
 }
