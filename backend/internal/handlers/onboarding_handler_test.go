@@ -293,6 +293,9 @@ func TestOnboarding_GetStatus_Onboarded(t *testing.T) {
 	if steps["orkaiSetup"] != true {
 		t.Errorf("steps.orkaiSetup = %v, want true", steps["orkaiSetup"])
 	}
+	if data["onboarded"] != true {
+		t.Errorf("onboarded = %v, want true when all three steps are done", data["onboarded"])
+	}
 }
 
 func TestOnboarding_GetStatus_NotOnboarded(t *testing.T) {
