@@ -1,0 +1,12 @@
+{
+  "toast": {
+    "llmConfigSaveFailed": "Failed to save LLM config",
+    "llmConfigSaved": "LLM config saved",
+    "llmConnectionValidated": "Connection validated",
+    "profileSaveFailed": "Failed to save profile",
+    "profileSaved": "Profile saved",
+    "profileUploadFailed": "Failed to upload profile",
+    "profileUploaded": "Profile uploaded successfully",
+    "setupTriggerFailed": "Failed to trigger Orkai setup"
+  }
+}
