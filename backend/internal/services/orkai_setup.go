@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/marco/resume-app/internal/models"
+	"github.com/marco/resume-app/internal/orkai"
 	"github.com/marco/resume-app/internal/store"
 )
 
@@ -35,9 +36,7 @@ func NewOrkaiSetupService(client OrkaiClient, s store.OnboardingStore) *OrkaiSet
 	return &OrkaiSetupService{
 		client: client,
 		store:  s,
-		detect: func() (string, error) {
-			return "", fmt.Errorf("orkai MCP token detection not available: set ORKAI_MCP_TOKEN environment variable")
-		},
+		detect: orkai.DetectMCPToken,
 	}
 }
 

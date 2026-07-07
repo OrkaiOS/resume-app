@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 // Config holds all resume-app configuration loaded from the environment.
@@ -30,7 +32,7 @@ type Config struct {
 	CORSAllowedOrigins string
 	// OrkaiHealthURL is the URL of the orkai daemon health endpoint (required).
 	OrkaiHealthURL string
-	// OrkaiMCPURL is the base URL of the orkai MCP API (default http://localhost:18787/mcp).
+	// OrkaiMCPURL is the SSE endpoint of the orkai MCP server (default http://127.0.0.1:8787/v2/sse).
 	OrkaiMCPURL string
 	// OrkaiMCPToken is the auth token for the orkai MCP API (required for onboarding).
 	OrkaiMCPToken string
@@ -43,6 +45,8 @@ type Config struct {
 // A missing required variable returns an actionable error rather than a
 // silent default.
 func Load() (Config, error) {
+	_ = godotenv.Load()
+
 	port, ok := os.LookupEnv("BACKEND_PORT")
 	if !ok || port == "" {
 		return Config{}, fmt.Errorf("config.Load: BACKEND_PORT is required (set it to the port the server should listen on, e.g. 8080)")

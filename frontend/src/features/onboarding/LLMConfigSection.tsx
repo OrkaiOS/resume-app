@@ -54,28 +54,28 @@ function LLMConfigSection({ onComplete }: LLMConfigSectionProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
-      <FormField
-        control={form.control}
-        name="provider"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>LLM Provider</FormLabel>
-            <Select value={field.value} onValueChange={field.onChange}>
-              <FormControl>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="ollama">Ollama (local)</SelectItem>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+          <FormField
+            control={form.control}
+            name="provider"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>LLM Provider</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a provider" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="ollama">Ollama — run locally</SelectItem>
+                    <SelectItem value="openai">OpenAI — cloud API</SelectItem>
+                    <SelectItem value="anthropic">Anthropic — cloud API</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
       {provider !== "ollama" && (
         <FormField

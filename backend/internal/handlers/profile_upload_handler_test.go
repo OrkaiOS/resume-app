@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -34,6 +36,28 @@ func (m *mockParser) ParseMarkdown(r io.Reader) (*models.Profile, error) {
 	return m.mdResult, m.mdErr
 }
 
+type mockLLMParser struct{}
+
+func (m *mockLLMParser) Parse(ctx context.Context, text string, provider, model, apiKey string) (*models.Profile, error) {
+	return nil, errors.New("not implemented in test")
+}
+
+type mockLlmConfigGetter struct{}
+
+func (m *mockLlmConfigGetter) GetStatus(ctx context.Context) (models.OnboardingState, error) {
+	return models.OnboardingState{}, nil
+}
+
+type mockProfileService struct{}
+
+func (m *mockProfileService) Get(ctx context.Context) (models.Profile, error) {
+	return models.Profile{}, nil
+}
+
+func (m *mockProfileService) Upsert(ctx context.Context, p models.Profile) (models.Profile, error) {
+	return p, nil
+}
+
 func newMultipartBody(t *testing.T, fieldName, fileName, content string) (*bytes.Buffer, string) {
 	t.Helper()
 	var buf bytes.Buffer
@@ -58,7 +82,7 @@ func TestProfileUpload_PDF(t *testing.T) {
 			ProfessionalSummary: "Experienced engineer",
 		},
 	}
-	handler := NewProfileUploadHandler(parser)
+	handler := NewProfileUploadHandler(parser, &mockLLMParser{}, &mockProfileService{}, &mockLlmConfigGetter{})
 
 	body, ct := newMultipartBody(t, "file", "resume.pdf", "fake pdf content")
 	rec := httptest.NewRecorder()
@@ -102,7 +126,7 @@ func TestProfileUpload_Markdown(t *testing.T) {
 			Email:    "john@example.com",
 		},
 	}
-	handler := NewProfileUploadHandler(parser)
+	handler := NewProfileUploadHandler(parser, &mockLLMParser{}, &mockProfileService{}, &mockLlmConfigGetter{})
 
 	body, ct := newMultipartBody(t, "file", "resume.md", "# John Smith\n\n## Contact\n- Email: john@example.com")
 	rec := httptest.NewRecorder()
@@ -141,7 +165,7 @@ func TestProfileUpload_MissingFile(t *testing.T) {
 	t.Parallel()
 
 	parser := &mockParser{}
-	handler := NewProfileUploadHandler(parser)
+	handler := NewProfileUploadHandler(parser, &mockLLMParser{}, &mockProfileService{}, &mockLlmConfigGetter{})
 
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
@@ -176,7 +200,7 @@ func TestProfileUpload_UnsupportedFileType(t *testing.T) {
 	t.Parallel()
 
 	parser := &mockParser{}
-	handler := NewProfileUploadHandler(parser)
+	handler := NewProfileUploadHandler(parser, &mockLLMParser{}, &mockProfileService{}, &mockLlmConfigGetter{})
 
 	body, ct := newMultipartBody(t, "file", "resume.docx", "fake docx content")
 	rec := httptest.NewRecorder()
@@ -209,7 +233,7 @@ func TestProfileUpload_ParserError(t *testing.T) {
 	parser := &mockParser{
 		pdfErr: io.ErrUnexpectedEOF,
 	}
-	handler := NewProfileUploadHandler(parser)
+	handler := NewProfileUploadHandler(parser, &mockLLMParser{}, &mockProfileService{}, &mockLlmConfigGetter{})
 
 	body, ct := newMultipartBody(t, "file", "resume.pdf", "fake pdf content")
 	rec := httptest.NewRecorder()
@@ -240,7 +264,7 @@ func TestProfileUpload_FileTooLarge(t *testing.T) {
 	t.Parallel()
 
 	parser := &mockParser{}
-	handler := NewProfileUploadHandler(parser)
+	handler := NewProfileUploadHandler(parser, &mockLLMParser{}, &mockProfileService{}, &mockLlmConfigGetter{})
 
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)

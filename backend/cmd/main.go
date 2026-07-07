@@ -79,7 +79,7 @@ func Run() error {
 	resumeSvc := services.NewResumeService(resumeStore)
 	coverLetterSvc := services.NewCoverLetterService(coverLetterStore)
 	artifactSvc := services.NewArtifactService(artifactStore)
-	onboardingSvc := services.NewOnboardingService(onboardingStore)
+	onboardingSvc := services.NewOnboardingServiceWithProfiles(onboardingStore, profileStore)
 
 	metrics := middleware.NewMetrics()
 
@@ -103,7 +103,8 @@ func Run() error {
 	v1.GET("/health/orkai", orkaiHealth.CheckHealth)
 
 	profileParser := services.NewProfileParser()
-	profileUploadHandler := handlers.NewProfileUploadHandler(profileParser)
+	profileLLMParser := services.NewProfileLLMParser()
+	profileUploadHandler := handlers.NewProfileUploadHandler(profileParser, profileLLMParser, profileSvc, onboardingSvc)
 	v1.POST("/profile/upload", profileUploadHandler.Upload)
 
 	profileHandler := handlers.NewProfileHandler(profileSvc)

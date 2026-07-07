@@ -201,13 +201,13 @@ export interface OrkaiSetupStep {
 }
 
 export interface OrkaiSetupStatus {
-  setupId: string
+  sessionId: string
   steps: OrkaiSetupStep[]
   completed: boolean
 }
 
 export interface OrkaiSetupResponse {
-  setupId: string
+  sessionId: string
 }
 
 export interface OnboardingStatus {
