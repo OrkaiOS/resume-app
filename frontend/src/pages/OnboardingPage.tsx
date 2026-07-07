@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react"
-import { Check, ChevronDown } from "lucide-react"
+import { Check, ChevronDown, Loader2 } from "lucide-react"
 
 import { Card, CardTitle, CardContent } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 
 import { useOnboardingStatus } from "@/api/onboarding"
 import { LLMConfigSection } from "@/features/onboarding/LLMConfigSection"
@@ -11,14 +12,14 @@ import { OrkaiSetupSection } from "@/features/onboarding/OrkaiSetupSection"
 interface OnboardingPageProps {}
 
 const STEPS = [
-  { id: 0, label: "LLM Config" },
-  { id: 1, label: "Profile" },
-  { id: 2, label: "Orkai Setup" },
+  { id: 0, label: "Connect LLM", description: "Choose your AI provider" },
+  { id: 1, label: "Your Profile", description: "Tell us about yourself" },
+  { id: 2, label: "Orkai Setup", description: "Wire up your workspace" },
 ] as const
 
 function OnboardingPage(_props: OnboardingPageProps) {
   const [openStep, setOpenStep] = useState(0)
-  const { data: status } = useOnboardingStatus()
+  const { data: status, isLoading } = useOnboardingStatus()
 
   const handleStepComplete = useCallback((stepId: number) => {
     if (stepId < STEPS.length - 1) {
@@ -29,7 +30,6 @@ function OnboardingPage(_props: OnboardingPageProps) {
   const stepDone = useCallback(
     (stepId: number) => {
       if (!status) return false
-      if (!status.onboarded) return false
       switch (stepId) {
         case 0:
           return status.steps.llmConfig
@@ -44,19 +44,41 @@ function OnboardingPage(_props: OnboardingPageProps) {
     [status]
   )
 
+  const completedCount = STEPS.filter((s) => stepDone(s.id)).length
+  const progress = (completedCount / STEPS.length) * 100
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading your workspace...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center bg-background py-8">
-      <div className="w-full max-w-3xl px-4">
+      <div className="w-full max-w-2xl px-4">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-foreground">Welcome to Resume App</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            Set Up Your Workspace
+          </h1>
           <p className="mt-2 text-muted-foreground">
-            Let&apos;s get you set up in three steps
+            Three steps to connect your tools and build better resumes
           </p>
+          <div className="mx-auto mt-6 flex max-w-xs items-center gap-3">
+            <Progress value={progress} className="h-1.5 flex-1" />
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {completedCount}/{STEPS.length}
+            </span>
+          </div>
         </div>
 
         <div className="space-y-3">
           {STEPS.map((step) => (
-            <Card key={step.id}>
+            <Card key={step.id} className={step.id === openStep ? "ring-2 ring-primary/20" : ""}>
               <button
                 type="button"
                 className="flex w-full items-center gap-4 p-4 text-left"
@@ -67,17 +89,20 @@ function OnboardingPage(_props: OnboardingPageProps) {
                     stepDone(step.id)
                       ? "bg-primary text-primary-foreground"
                       : step.id === openStep
-                        ? "border-2 border-primary text-primary"
-                        : "border-2 border-muted-foreground/30 text-muted-foreground"
+                        ? "ring-2 ring-primary text-primary"
+                        : "ring-1 ring-foreground/15 text-muted-foreground"
                   }`}
                 >
                   {stepDone(step.id) ? <Check className="size-4" /> : step.id + 1}
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-base">{step.label}</CardTitle>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {step.description}
+                  </p>
                 </div>
                 <ChevronDown
-                  className={`size-5 text-muted-foreground transition-transform ${
+                  className={`size-5 shrink-0 text-muted-foreground transition-transform ${
                     openStep === step.id ? "rotate-180" : ""
                   }`}
                 />
