@@ -20,7 +20,7 @@ const onboardingKeys = {
 export function useOnboardingStatus() {
   return useQuery({
     queryKey: onboardingKeys.status(),
-    queryFn: () => apiGet<OnboardingStatus>("/v1/api/onboarding/status"),
+    queryFn: () => apiGet<OnboardingStatus>("/onboarding/status"),
     select: (res) => res.data,
   })
 }
@@ -29,7 +29,7 @@ export function useSaveLLMConfig() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: LLMConfigRequest) =>
-      apiPost<LLMConfigResponse>("/v1/api/onboarding/llm-config", input),
+      apiPost<LLMConfigResponse>("/onboarding/llm-config", input),
     onSuccess: (res) => {
       if (res.error) {
         toast.error("Failed to save LLM config", {
@@ -54,7 +54,7 @@ export function useSaveProfile() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: ProfileUpsertRequest) =>
-      apiPost<ProfileResponse>("/v1/api/onboarding/profile", input),
+      apiPost<ProfileResponse>("/onboarding/profile", input),
     onSuccess: (res) => {
       if (res.error) {
         toast.error("Failed to save profile", {
@@ -77,7 +77,7 @@ export function useUploadProfile() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (file: File) =>
-      apiUpload<ProfileResponse>("/v1/api/profile/upload", file),
+      apiUpload<ProfileResponse>("/profile/upload", file),
     onSuccess: (res) => {
       if (res.error) {
         toast.error("Failed to upload profile", {
@@ -99,7 +99,7 @@ export function useUploadProfile() {
 export function useTriggerOrkaiSetup() {
   return useMutation({
     mutationFn: () =>
-      apiPost<OrkaiSetupResponse>("/v1/api/onboarding/orkai-setup", {}),
+      apiPost<OrkaiSetupResponse>("/onboarding/orkai-setup", {}),
     onError: (e: Error) => {
       toast.error("Failed to trigger orkai setup", {
         description: e.message,
@@ -112,13 +112,13 @@ export function useOrkaiSetupStatus(setupId: string, enabled: boolean) {
   return useQuery({
     queryKey: onboardingKeys.orkaiSetup(setupId),
     queryFn: () =>
-      apiGet<OrkaiSetupStatus>(`/v1/api/onboarding/orkai-setup/status?setupId=${setupId}`),
+      apiGet<OrkaiSetupStatus>(`/onboarding/orkai-setup/status?sessionId=${setupId}`),
     select: (res) => res.data,
     enabled: !!setupId && enabled,
     refetchInterval: (query) => {
-      const data = query.state.data
-      if (data?.data?.completed) return false
-      return 1000
+      const res = query.state.data
+      if (!res || res.error) return 1000
+      return res.data.completed ? false : 1000
     },
   })
 }
