@@ -45,6 +45,10 @@ export async function apiPut<T>(
   })
 }
 
+export async function apiDelete<T>(path: string): Promise<ApiResponse<T>> {
+  return request<T>(path, { method: "DELETE" })
+}
+
 export async function apiUpload<T>(
   path: string,
   file: File

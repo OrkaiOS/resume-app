@@ -184,6 +184,8 @@ func (h *OnboardingHandler) GetStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, Success(toStatusResponse(state, hasProfile)))
 }
 
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision Derive Onboarded from the three step flags, not from OnboardedAt — MarkComplete is never called by any service, so the timestamp is always zero and the gate never flips to "app". Deriving from steps is robust and matches the gate's actual semantics.
 func toStatusResponse(state models.OnboardingState, hasProfile bool) onboardingStatusResponse {
 	llmDone := state.LLMProvider != "" && state.LLMModel != ""
 	profileDone := hasProfile ||
@@ -194,7 +196,7 @@ func toStatusResponse(state models.OnboardingState, hasProfile bool) onboardingS
 	orkaiDone := state.OrkaiCategoryID != ""
 
 	return onboardingStatusResponse{
-		Onboarded: !state.OnboardedAt.IsZero(),
+		Onboarded: llmDone && profileDone && orkaiDone,
 		Steps: onboardingSteps{
 			LLMConfig:  llmDone,
 			Profile:    profileDone,

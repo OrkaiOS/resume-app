@@ -7,6 +7,31 @@
     "profileSaved": "Profile saved",
     "profileUploadFailed": "Failed to upload profile",
     "profileUploaded": "Profile uploaded successfully",
-    "setupTriggerFailed": "Failed to trigger Orkai setup"
+    "setupTriggerFailed": "Failed to trigger Orkai setup",
+    "opportunityCreated": "Opportunity created",
+    "opportunityCreateFailed": "Failed to create opportunity",
+    "opportunityDeleted": "Opportunity deleted",
+    "chatComingSoon": "Chat coming soon"
+  },
+  "home": {
+    "emptyTitle": "No applications yet",
+    "emptyDescription": "Create your first opportunity to start building tailored resumes.",
+    "emptyAction": "Start Chat",
+    "newOpportunity": "New opportunity",
+    "openAgent": "Open Agent",
+    "createCompanyLabel": "Company",
+    "createRoleLabel": "Role",
+    "createDescriptionLabel": "Description (optional)",
+    "createSubmit": "Create",
+    "createCancel": "Cancel",
+    "createCompanyPlaceholder": "Acme Corp",
+    "createRolePlaceholder": "Backend Developer",
+    "createDescriptionPlaceholder": "Job description or notes",
+    "loading": "Loading your opportunities...",
+    "errorTitle": "Could not load opportunities",
+    "errorRetry": "Retry",
+    "errorDescription": "Something went wrong. Please try again.",
+    "title": "Your Opportunities",
+    "subtitle": "Track and tailor applications for each role."
   }
 }
