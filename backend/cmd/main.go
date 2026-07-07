@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/marco/resume-app/internal/config"
 	"github.com/marco/resume-app/internal/handlers"
+	"github.com/marco/resume-app/internal/llm"
 	"github.com/marco/resume-app/internal/middleware"
 	"github.com/marco/resume-app/internal/orkai"
 	"github.com/marco/resume-app/internal/services"
@@ -146,6 +148,10 @@ func Run() error {
 	v1.POST("/onboarding/orkai-setup", orkaiSetupHandler.StartSetup)
 	v1.GET("/onboarding/orkai-setup/status", orkaiSetupHandler.GetStatus)
 
+	llmClient := createLLMClient(cfg, onboardingStore)
+	chatHandler := handlers.NewChatHandler(llmClient)
+	v1.POST("/chat", chatHandler.Stream)
+
 	if hasFrontendFS {
 		if err := serveSPA(router, prodFrontendFS); err != nil {
 			return err
@@ -156,6 +162,19 @@ func Run() error {
 
 	log.Printf("resume-app server listening on :%s", cfg.Port)
 	return router.Run(":" + cfg.Port)
+}
+
+func createLLMClient(cfg config.Config, onboardingStore store.OnboardingStore) llm.Client {
+	state, err := onboardingStore.Get(context.Background())
+	provider := cfg.LLMProvider
+	model := cfg.LLMModel
+	apiKey := cfg.LLMAPIKey
+	if err == nil && state.LLMProvider != "" {
+		provider = state.LLMProvider
+		model = state.LLMModel
+		apiKey = state.LLMAPIKey
+	}
+	return llm.NewClient(provider, model, apiKey)
 }
 
 func main() {

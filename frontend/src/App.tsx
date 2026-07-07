@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react"
 import { Sparkles } from "lucide-react"
 import OrkaiHealthProvider from "@/hooks/OrkaiHealthProvider"
 import { useOrkaiHealth } from "@/hooks/useOrkaiHealth"
@@ -7,9 +8,25 @@ import OnboardingPage from "@/pages/OnboardingPage"
 import OrkaiStatusPage from "@/pages/OrkaiStatusPage"
 import HomePage from "@/pages/HomePage"
 
+const ChatPage = lazy(() => import("@/pages/ChatPage"))
+
+const isChatRoute = () => window.location.search.includes("chat=")
+
 function AppContent() {
   const { isOrkaiRunning } = useOrkaiHealth()
   const { isOnboarded } = useOnboardingStatus()
+
+  if (isChatRoute()) {
+    return (
+      <Suspense fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <Sparkles className="size-8 animate-pulse text-primary" />
+        </div>
+      }>
+        <ChatPage />
+      </Suspense>
+    )
+  }
 
   const gate = resolveAppGate(isOrkaiRunning, isOnboarded)
 
