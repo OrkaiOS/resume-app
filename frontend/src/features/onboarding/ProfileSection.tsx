@@ -34,6 +34,100 @@ function toProfileRequest(values: ProfileFormValues): ProfileUpsertRequest {
   }
 }
 
+function sanitizeProfileResponse(data: Record<string, unknown>): ProfileFormValues {
+  const sanitizeStr = (v: unknown) => (typeof v === "string" ? v : "") ?? ""
+  const fixURL = (v: unknown) => {
+    const s = sanitizeStr(v)
+    if (s && !/^https?:\/\//i.test(s)) return "https://" + s
+    return s
+  }
+
+  return {
+    fullName: sanitizeStr(data.fullName),
+    email: sanitizeStr(data.email),
+    phone: sanitizeStr(data.phone),
+    location: sanitizeStr(data.location),
+    linkedinUrl: fixURL(data.linkedinUrl),
+    websiteUrl: fixURL(data.websiteUrl),
+    githubUrl: fixURL(data.githubUrl),
+    professionalSummary: sanitizeStr(data.professionalSummary),
+    workExperience: normalizeArray(data.workExperience).map(toWorkExperience),
+    education: normalizeArray(data.education).map(toEducation),
+    skills: normalizeArray(data.skills).map(toSkillCategory),
+    projects: normalizeArray(data.projects).map(toProject),
+    certifications: normalizeArray(data.certifications).map(toCertification),
+    languages: normalizeArray(data.languages).map(toLanguage),
+  }
+}
+
+function normalizeArray(v: unknown): Record<string, unknown>[] {
+  return Array.isArray(v) ? (v as Record<string, unknown>[]) : []
+}
+
+function toWorkExperience(w: Record<string, unknown>) {
+  return {
+    jobTitle: str(w.jobTitle),
+    company: str(w.company),
+    location: str(w.location),
+    startDate: str(w.startDate),
+    endDate: str(w.endDate),
+    description: str(w.description),
+  }
+}
+
+function toEducation(e: Record<string, unknown>) {
+  return {
+    degree: str(e.degree),
+    institution: str(e.institution),
+    location: str(e.location),
+    startDate: str(e.startDate),
+    endDate: str(e.endDate),
+    gpa: str(e.gpa),
+    description: str(e.description),
+  }
+}
+
+function toSkillCategory(s: Record<string, unknown>) {
+  return {
+    name: str(s.name),
+    skills: Array.isArray(s.skills) ? (s.skills as string[]).filter((x) => typeof x === "string") : [],
+  }
+}
+
+function toProject(p: Record<string, unknown>) {
+  const rawURL = str(p.url)
+  return {
+    name: str(p.name),
+    role: str(p.role),
+    description: str(p.description),
+    technologies: Array.isArray(p.technologies)
+      ? (p.technologies as string[]).filter((x) => typeof x === "string")
+      : [],
+    url: rawURL && !/^https?:\/\//i.test(rawURL) ? "https://" + rawURL : rawURL,
+  }
+}
+
+function toCertification(c: Record<string, unknown>) {
+  return {
+    name: str(c.name),
+    issuingOrg: str(c.issuingOrg),
+    dateObtained: str(c.dateObtained),
+    expiryDate: str(c.expiryDate),
+    credentialUrl: str(c.credentialUrl),
+  }
+}
+
+function toLanguage(l: Record<string, unknown>) {
+  return {
+    name: str(l.name),
+    proficiency: str(l.proficiency),
+  }
+}
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : ""
+}
+
 const PROFILE_STORAGE_KEY = "onboarding-profile-form"
 
 interface ProfileSectionProps {
@@ -138,19 +232,24 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
 
   function handleFile(file: File) {
     uploadProfile.mutate(file, {
-      onSuccess: () => onComplete(),
+      onSuccess: (res) => {
+        if (res.data && !res.error) {
+          form.reset(sanitizeProfileResponse(res.data as unknown as Record<string, unknown>))
+          setActiveTab("manual")
+        }
+      },
     })
   }
 
   return (
     <div className="space-y-4 pt-2">
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-0 border-b-2 border-border">
         <button
           type="button"
-          className={`px-3 py-2 text-sm font-medium transition-colors ${
+          className={`rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === "manual"
-              ? "border-b-2 border-primary text-primary"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           }`}
           onClick={() => setActiveTab("manual")}
         >
@@ -158,10 +257,10 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
         </button>
         <button
           type="button"
-          className={`px-3 py-2 text-sm font-medium transition-colors ${
+          className={`rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === "upload"
-              ? "border-b-2 border-primary text-primary"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           }`}
           onClick={() => setActiveTab("upload")}
         >
@@ -173,22 +272,22 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
         <div
           className={`flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors ${
             dragActive
-              ? "border-primary bg-muted/50"
-              : "border-muted-foreground/30"
+              ? "border-primary bg-primary/5"
+              : "border-border"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
-          <Upload className="size-8 text-muted-foreground" />
+          <Upload className={`size-8 ${dragActive ? "text-primary" : "text-muted-foreground"}`} />
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
               Drop your resume (PDF or Markdown) here
             </p>
             <button
               type="button"
-              className="mt-1 text-sm text-primary underline"
+              className="mt-1 text-sm font-medium text-primary underline underline-offset-2 hover:text-primary/80"
               onClick={() => fileInputRef.current?.click()}
             >
               or browse files
@@ -204,8 +303,13 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
           {uploadProfile.isPending && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              Uploading and parsing...
+              Parsing your resume...
             </div>
+          )}
+          {uploadProfile.isError && (
+            <p className="text-sm text-destructive">
+              Could not parse the file. Try again or enter details manually.
+            </p>
           )}
         </div>
       )}
@@ -215,7 +319,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
         <form onChange={handleChange} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-foreground">Personal Info</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField
                 control={form.control}
                 name="fullName"
@@ -346,10 +450,16 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                 Add
               </Button>
             </div>
+            {workExperienceArray.fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No positions added yet. Add roles from your career history to
+                build your resume.
+              </p>
+            )}
             {workExperienceArray.fields.map((field, index) => (
               <div key={field.id} className="space-y-2 rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <Badge variant="secondary">Experience {index + 1}</Badge>
+                  <Badge variant="secondary">Position {index + 1}</Badge>
                   <Button
                     type="button"
                     variant="ghost"
@@ -359,7 +469,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                     <Trash2 className="size-3 text-destructive" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name={`workExperience.${index}.jobTitle`}
@@ -468,6 +578,12 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                 Add
               </Button>
             </div>
+            {educationArray.fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No education entries added yet. Add degrees and certifications to
+                strengthen your profile.
+              </p>
+            )}
             {educationArray.fields.map((field, index) => (
               <div key={field.id} className="space-y-2 rounded-md border p-3">
                 <div className="flex items-center justify-between">
@@ -481,7 +597,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                     <Trash2 className="size-3 text-destructive" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name={`education.${index}.degree`}
@@ -594,6 +710,12 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                 Add Category
               </Button>
             </div>
+            {skillsArray.fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No skill categories added yet. Group your skills into categories
+                like Languages, Frameworks, and Tools.
+              </p>
+            )}
             {skillsArray.fields.map((field, index) => (
               <div key={field.id} className="space-y-2 rounded-md border p-3">
                 <div className="flex items-center justify-between">
@@ -652,6 +774,12 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                 Add
               </Button>
             </div>
+            {projectsArray.fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No projects added yet. Showcase your work with project names,
+                descriptions, and technologies used.
+              </p>
+            )}
             {projectsArray.fields.map((field, index) => (
               <div key={field.id} className="space-y-2 rounded-md border p-3">
                 <div className="flex items-center justify-between">
@@ -665,7 +793,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                     <Trash2 className="size-3 text-destructive" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name={`projects.${index}.name`}
@@ -754,6 +882,12 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                 Add
               </Button>
             </div>
+            {certificationsArray.fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No certifications added yet. List professional certifications to
+                validate your expertise.
+              </p>
+            )}
             {certificationsArray.fields.map((field, index) => (
               <div key={field.id} className="space-y-2 rounded-md border p-3">
                 <div className="flex items-center justify-between">
@@ -767,7 +901,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                     <Trash2 className="size-3 text-destructive" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name={`certifications.${index}.name`}
@@ -857,6 +991,12 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
                 Add
               </Button>
             </div>
+            {languagesArray.fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No languages added yet. Add languages you speak with proficiency
+                levels.
+              </p>
+            )}
             {languagesArray.fields.map((field, index) => (
               <div key={field.id} className="flex items-end gap-2 rounded-md border p-3">
                 <FormField
