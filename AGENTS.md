@@ -227,11 +227,12 @@ staged (glob-scoped per `lefthook.yml`).
 
 ### Role Workflows (lazy-load, trigger on matching task or intent)
 
-Four project-scoped role workflows own the full product lifecycle: from
-requirements through planning to implementation. Each enforces its own
-standards, skills, test practice, and deterministic gates. Load the full steps
-with `workflow(action: "get", id: ...)` only when a task matches the
-workflow's scope — do NOT load them during session startup or onboarding.
+Six project-scoped role workflows own the full product lifecycle: from
+requirements through planning to implementation, plus a Fullstack fast-path.
+Each enforces its own standards, skills, test practice, and deterministic gates.
+Load the full steps with `workflow(action: "get", id: ...)` only when a task
+matches the workflow's scope — do NOT load them during session startup or
+onboarding.
 
 | Workflow | ID | Trigger | Gates |
 |----------|----|---------|-------|
@@ -241,22 +242,49 @@ workflow's scope — do NOT load them during session startup or onboarding.
 | Backend Developer (resume-app) | `2840ff4a-179d-4551-b1d5-c39130533961` | Any implementation task touching `backend/**` (Go + Gin: handlers, services, models, middleware, store, cmd) | `go build`, `go vet`, `gofmt -l`, `go test` |
 | Frontend Developer (resume-app) | `6aee46f4-e39c-4f21-bcbc-3916a49dd464` | Any implementation task touching `frontend/**` (React + Vite + TS: components, pages, hooks, api, store, types, lib) | `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` |
 | Frontend QA (resume-app) | `0fc856e1-9fe3-446b-a2de-6ad6319e08e5` | QA task created by Frontend Developer after implementation that introduces or modifies UI. Receives a precise test script (URLs, elements, interactions, assertions) and executes Playwright browser tests against the running dev environment. | Zero console errors, all elements render, all interactions produce expected outcomes, all ACs satisfied |
+| Fullstack Developer (resume-app) | `10d6213a-0f71-4a45-8e50-b58b7243637f` | Marco wants a vertical feature slice shipped fast in one session. Combines lightweight planning + backend + frontend + self-QA. Coexists with the role pipeline — Marco picks Fullstack for speed on vertical slices, the role pipeline for risky/standards-heavy work. | All backend gates (`go build`, `go vet` zero output, `gofmt -l` zero files, `go test`) AND all frontend gates (`npm run lint` zero output, `npm run typecheck`, `npm run test`, `npm run build`) AND Playwright self-QA (no console errors, all ACs satisfied) |
 
-The Product Owner shapes the product in `docs/requirement.md` (what and why).
-The Architect bridges requirements to architecture (plan mode) and implementation
-back to standards (review mode). The Feature Planner then turns stable
-architecture into plan > milestone > tasks (how). The Developer workflows
-implement tasks with full gate enforcement and annotate+tag linking new code to
-standards. Full lifecycle: Product Owner → Architect (plan) → Feature Planner →
-Backend/Frontend Developer → Frontend QA (when UI changed) → Architect (review).
+Two paths from requirements to merged code:
 
-New features: Product Owner shapes requirements first → Architect (plan mode)
-establishes architecture and ensures standards coverage → Feature Planner creates
-plan > milestone > tasks → Marco approves → Marco triggers the matching
-Developer workflow per task → Architect (review mode) audits code against plan
-intent and standards, runs `orkai review`, fixes gaps. Implementation tasks MUST
-be handed off to the matching Developer workflow; do not implement backend or
-frontend code ad hoc.
+**Role pipeline (separation, standards-heavy work).** The Product Owner shapes
+the product in `docs/requirement.md` (what and why). The Architect bridges
+requirements to architecture (plan mode) and implementation back to standards
+(review mode). The Feature Planner then turns stable architecture into plan >
+milestone > tasks (how). The Developer workflows implement tasks with full gate
+enforcement and `annotations(create)` + `entity(update, relations)` linking new
+code to standards. Full lifecycle: Product Owner → Architect (plan) → Feature
+Planner → Backend/Frontend Developer → Frontend QA (when UI changed) →
+Architect (review).
+
+New features (role pipeline): Product Owner shapes requirements first →
+Architect (plan mode) establishes architecture and ensures standards coverage →
+Feature Planner creates plan > milestone > tasks → Marco approves → Marco
+triggers the matching Developer workflow per task → Architect (review mode)
+audits code against plan intent and standards, runs `orkai review`, fixes gaps.
+Implementation tasks MUST be handed off to the matching Developer workflow; do
+not implement backend or frontend code ad hoc.
+
+**Fullstack fast-path (vertical slices, speed).** Marco triggers the Fullstack
+Developer workflow directly. It does its own lightweight plan (one batched
+search, one plan > one milestone > 1–3 vertical-slice tasks covering both
+surfaces), implements backend + frontend in one branch per task, writes unit
+tests, runs all backend + frontend gates (ZERO diagnostics), runs Playwright
+self-QA in the same session, merges with `--no-ff`, escalates orkai review false
+positives to the Architect (same commit-hash format as the other developers).
+Cost-efficiency moves vs the role pipeline: standards documented via inline
+`@orkai:ref` and `@orkai:decision` source tags (materialized once at index time,
+not via per-entity `annotations(create)` / `entity(update, relations)` tool
+calls); one batched search instead of sequential; one branch + one merge per
+vertical-slice task (both surfaces) instead of one per task per surface;
+`orkai index .` once per milestone instead of per task; no separate smoke test
+(QA boot validates `/health` and frontend render). The `@orkai` tag pattern is
+scoped to the Fullstack workflow only — the Backend/Frontend Developer workflows
+keep their `annotations(create)` + `entity(update, relations)` steps.
+
+Pick Fullstack for speed on a vertical slice (1–3 FRs, 2–8 files, one session).
+Pick the role pipeline when separation matters: risky/standards-heavy work,
+PO-driven discovery, or when Marco wants the Architect to own architecture
+before the Feature Planner splits tasks.
 
 ### Audit Workflow (lazy-load, not required onboarding)
 
