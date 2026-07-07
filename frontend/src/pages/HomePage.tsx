@@ -10,9 +10,9 @@ import { EmptyState } from "@/features/home/EmptyState"
 import { CreateOpportunityForm } from "@/features/home/CreateOpportunityForm"
 
 // @orkai:ref(id=2cf97580-172f-410d-81b4-edb7e177a7b3)
-// @orkai:ref(id=96a4fb45)
-// @orkai:ref(id=6e959cda)
-// @orkai:ref(id=5759c69e)
+// @orkai:ref(id=96a4fb45-c107-4855-8f1a-cb701c958dac)
+// @orkai:ref(id=6e959cda-9e4a-4c44-b87e-4c43deea936f)
+// @orkai:ref(id=5759c69e-7fc5-4e0c-8e9e-554fd4388492)
 // @orkai:decision Loading/error/empty/populated states per NFR-14; responsive grid 1 col mobile, 2 col md, 3 col lg per NFR-13 (1024-2560px)
 function HomePage() {
   const { data, isLoading, isError, refetch } = useOpportunities()

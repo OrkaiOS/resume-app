@@ -26,8 +26,8 @@ interface CreateOpportunityFormProps {
 }
 
 // @orkai:ref(id=2cf97580-172f-410d-81b4-edb7e177a7b3)
-// @orkai:ref(id=359cbba1)
-// @orkai:ref(id=5759c69e)
+// @orkai:ref(id=359cbba1-0559-4db9-af44-3533e0ab918c)
+// @orkai:ref(id=5759c69e-7fc5-4e0c-8e9e-554fd4388492)
 // @orkai:decision Inline Card-based form (no separate route) — App.tsx switches on gate not URL, so the create flow lives inside the Home page surface
 function CreateOpportunityForm({ onCancel, onCreated }: CreateOpportunityFormProps) {
   const createOpportunity = useCreateOpportunity()
