@@ -162,6 +162,7 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
   const persisted = loadPersistedProfile()
 
   const form = useForm<ProfileFormValues>({
+    mode: "onBlur",
     resolver: zodResolver(profileSchema) as unknown as Resolver<ProfileFormValues>,
     defaultValues: persisted ?? {
       fullName: "",
@@ -307,9 +308,22 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
           )}
           {uploadProfile.isError && (
-            <p className="text-sm text-destructive">
-              Could not parse the file. Try again or enter details manually.
-            </p>
+            <div className="text-center">
+              <p className="text-sm text-destructive">
+                Could not parse the file — it may be in an unsupported format or corrupted.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Make sure the file is a valid PDF or Markdown. You can also{" "}
+                <button
+                  type="button"
+                  className="text-primary underline underline-offset-2 hover:text-primary/80"
+                  onClick={() => setActiveTab("manual")}
+                >
+                  enter your details manually
+                </button>
+                .
+              </p>
+            </div>
           )}
         </div>
       )}
@@ -452,8 +466,8 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
             {workExperienceArray.fields.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No positions added yet. Add roles from your career history to
-                build your resume.
+                No positions added yet — use the Add button above to include
+                roles from your career history.
               </p>
             )}
             {workExperienceArray.fields.map((field, index) => (
@@ -580,8 +594,8 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
             {educationArray.fields.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No education entries added yet. Add degrees and certifications to
-                strengthen your profile.
+                No education entries added yet — use the Add button above to
+                include your degrees and certifications.
               </p>
             )}
             {educationArray.fields.map((field, index) => (
@@ -712,8 +726,8 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
             {skillsArray.fields.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No skill categories added yet. Group your skills into categories
-                like Languages, Frameworks, and Tools.
+                No skill categories added yet — use Add Category above to group
+                your skills into categories like Languages, Frameworks, and Tools.
               </p>
             )}
             {skillsArray.fields.map((field, index) => (
@@ -776,8 +790,8 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
             {projectsArray.fields.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No projects added yet. Showcase your work with project names,
-                descriptions, and technologies used.
+                No projects added yet — use the Add button above to showcase your
+                work with project names, descriptions, and technologies.
               </p>
             )}
             {projectsArray.fields.map((field, index) => (
@@ -884,8 +898,8 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
             {certificationsArray.fields.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No certifications added yet. List professional certifications to
-                validate your expertise.
+                No certifications added yet — use the Add button above to list
+                professional certifications that validate your expertise.
               </p>
             )}
             {certificationsArray.fields.map((field, index) => (
@@ -993,8 +1007,8 @@ function ProfileSection({ onComplete }: ProfileSectionProps) {
             </div>
             {languagesArray.fields.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No languages added yet. Add languages you speak with proficiency
-                levels.
+                No languages added yet — use the Add button above to include
+                languages you speak with their proficiency levels.
               </p>
             )}
             {languagesArray.fields.map((field, index) => (

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { apiGet, apiPost, apiUpload } from "@/api/client"
+import { S } from "@/lib/strings"
 import type {
   LLMConfigRequest,
   LLMConfigResponse,
@@ -14,7 +15,7 @@ import type {
 const onboardingKeys = {
   all: ["onboarding"] as const,
   status: () => [...onboardingKeys.all, "status"] as const,
-  orkaiSetup: (setupId: string) => [...onboardingKeys.all, "orkai-setup", setupId] as const,
+  onboardingSetup: (setupId: string) => [...onboardingKeys.all, "onboarding-final-step", setupId] as const,
 }
 
 export function useOnboardingStatus() {
@@ -32,13 +33,13 @@ export function useSaveLLMConfig() {
       apiPost<LLMConfigResponse>("/onboarding/llm-config", input),
     onSuccess: (res) => {
       if (res.error) {
-        toast.error("Failed to save LLM config", {
+        toast.error(S.toast.llmConfigSaveFailed, {
           description: res.error.message,
         })
         return
       }
-      toast.success("LLM config saved", {
-        description: res.data?.validated ? "Connection validated" : undefined,
+      toast.success(S.toast.llmConfigSaved, {
+        description: res.data?.validated ? S.toast.llmConnectionValidated : undefined,
       })
       queryClient.invalidateQueries({ queryKey: onboardingKeys.status() })
     },
@@ -57,12 +58,12 @@ export function useSaveProfile() {
       apiPost<ProfileResponse>("/onboarding/profile", input),
     onSuccess: (res) => {
       if (res.error) {
-        toast.error("Failed to save profile", {
+        toast.error(S.toast.profileSaveFailed, {
           description: res.error.message,
         })
         return
       }
-      toast.success("Profile saved")
+      toast.success(S.toast.profileSaved)
       queryClient.invalidateQueries({ queryKey: onboardingKeys.status() })
     },
     onError: (e: Error) => {
@@ -80,12 +81,12 @@ export function useUploadProfile() {
       apiUpload<ProfileResponse>("/profile/upload", file),
     onSuccess: (res) => {
       if (res.error) {
-        toast.error("Failed to upload profile", {
+        toast.error(S.toast.profileUploadFailed, {
           description: res.error.message,
         })
         return
       }
-      toast.success("Profile uploaded successfully")
+      toast.success(S.toast.profileUploaded)
       queryClient.invalidateQueries({ queryKey: onboardingKeys.status() })
     },
     onError: (e: Error) => {
@@ -96,21 +97,21 @@ export function useUploadProfile() {
   })
 }
 
-export function useTriggerOrkaiSetup() {
+export function useTriggerSetup() {
   return useMutation({
     mutationFn: () =>
       apiPost<OrkaiSetupResponse>("/onboarding/orkai-setup", {}),
     onError: (e: Error) => {
-      toast.error("Failed to trigger orkai setup", {
+      toast.error(S.toast.setupTriggerFailed, {
         description: e.message,
       })
     },
   })
 }
 
-export function useOrkaiSetupStatus(setupId: string, enabled: boolean) {
+export function useSetupStatus(setupId: string, enabled: boolean) {
   return useQuery({
-    queryKey: onboardingKeys.orkaiSetup(setupId),
+    queryKey: onboardingKeys.onboardingSetup(setupId),
     queryFn: () =>
       apiGet<OrkaiSetupStatus>(`/onboarding/orkai-setup/status?sessionId=${setupId}`),
     select: (res) => res.data,

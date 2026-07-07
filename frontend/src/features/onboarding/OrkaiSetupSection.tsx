@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 
-import { useTriggerOrkaiSetup, useOrkaiSetupStatus } from "@/api/onboarding"
+import { useTriggerSetup, useSetupStatus } from "@/api/onboarding"
 import type { OrkaiSetupStep } from "@/types/api"
 
 interface OrkaiSetupSectionProps {
@@ -40,8 +40,8 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
   const [setupId, setSetupId] = useState<string | null>(null)
   const [setupStarted, setSetupStarted] = useState(false)
 
-  const triggerSetup = useTriggerOrkaiSetup()
-  const { data: setupStatus, isLoading } = useOrkaiSetupStatus(setupId ?? "", setupStarted)
+  const triggerSetup = useTriggerSetup()
+  const { data: setupStatus, isLoading } = useSetupStatus(setupId ?? "", setupStarted)
 
   function handleStart() {
     triggerSetup.mutate(undefined, {
@@ -68,7 +68,7 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
     return (
       <div className="space-y-4 pt-2">
         <p className="text-sm text-muted-foreground">
-          Connect orkai to your workspace with a one-click setup. This creates
+          Connect Orkai to your workspace with a one-click setup. This creates
           the standards, skills, and documents needed for resume generation.
         </p>
         <Button
@@ -79,7 +79,7 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
           {triggerSetup.isPending ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
-              Connecting to orkai...
+              Connecting to Orkai...
             </>
           ) : (
             "Start Setup"
@@ -87,13 +87,13 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
         </Button>
         {triggerSetup.isError && (
           <p className="text-sm text-destructive">
-            Could not connect to orkai. Check that the daemon is running and try
+            Could not connect to Orkai. Check that the daemon is running and try
             again.
           </p>
         )}
         {disabled && (
           <p className="text-xs text-muted-foreground">
-            Complete the previous steps before setting up orkai.
+            Complete the previous steps before setting up Orkai.
           </p>
         )}
       </div>
@@ -109,18 +109,20 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
         </span>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {isLoading ? (
           <div className="flex items-center gap-3 py-4">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              Initializing setup...
+              Setting up your workspace — creating standards, skills, and
+              documents for resume generation. This may take a moment.
             </span>
           </div>
         ) : steps.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">
-            Setup steps are being prepared. This creates standards, skills, and
-            documents in your orkai workspace.
+            Setup steps are being prepared. You'll see a checklist of items
+            created automatically — standards, skills, and documents for your
+            workspace. No action needed — this runs on its own.
           </p>
         ) : (
           SETUP_STEPS.map((stepName, index) => {
@@ -148,7 +150,7 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
                 </Badge>
               </div>
               {status === "failed" && error && (
-                <p className="ml-10 text-xs text-destructive">{error}</p>
+                <p className="ml-8 text-xs text-destructive">{error}</p>
               )}
             </div>
           )
@@ -163,18 +165,21 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
       )}
 
       {!isComplete && steps.some((s) => s.status === "failed") && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <Button
-            variant="outline"
             className="w-full"
             onClick={handleRetry}
           >
             <RotateCcw className="mr-2 size-4" />
             Retry Setup
           </Button>
-          <Button variant="ghost" className="w-full" onClick={onComplete}>
-            Skip and continue
-          </Button>
+          <button
+            type="button"
+            className="mx-auto block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            onClick={onComplete}
+          >
+            Continue without setup
+          </button>
         </div>
       )}
     </div>
