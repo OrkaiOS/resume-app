@@ -91,8 +91,36 @@ function CreateOpportunityForm({ onCancel, onCreated }: CreateOpportunityFormPro
               <FormControl>
                 <Textarea
                   placeholder={S.home.createDescriptionPlaceholder}
-                  rows={3}
+                  rows={6}
                   {...field}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text/plain")
+                    if (!pasted) return
+
+                    e.preventDefault()
+
+                    const cleaned = pasted
+                      .replace(/\r\n/g, "\n")
+                      .replace(/\r/g, "\n")
+                      .replace(/\n{3,}/g, "\n\n")
+                      .trim()
+
+                    const target = e.currentTarget
+                    const start = target.selectionStart
+                    const end = target.selectionEnd
+                    const currentValue = field.value || ""
+                    const newValue =
+                      currentValue.slice(0, start) +
+                      cleaned +
+                      currentValue.slice(end)
+
+                    field.onChange(newValue)
+
+                    requestAnimationFrame(() => {
+                      target.selectionStart = target.selectionEnd =
+                        start + cleaned.length
+                    })
+                  }}
                 />
               </FormControl>
               <FormMessage />

@@ -21,7 +21,7 @@
     "openAgent": "Open Agent",
     "createCompanyLabel": "Company",
     "createRoleLabel": "Role",
-    "createDescriptionLabel": "Description (optional)",
+    "createDescriptionLabel": "Description",
     "createSubmit": "Create",
     "createCancel": "Cancel",
     "createCompanyPlaceholder": "Acme Corp",
