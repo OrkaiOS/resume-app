@@ -29,6 +29,11 @@ const (
 	// StreamEventText is emitted for each token chunk of the assistant's
 	// text response.
 	StreamEventText StreamEventType = "text"
+	// StreamEventReasoning is emitted for each reasoning token chunk
+	// produced by the LLM (Ollama <think> blocks, OpenAI o-series
+	// reasoning summaries). Reasoning is display-only and must not be
+	// included in the message content sent back to the LLM.
+	StreamEventReasoning StreamEventType = "reasoning"
 	// StreamEventToolCalls is emitted when the LLM finishes a response
 	// that requested one or more tool invocations. The assistant will
 	// not produce further text until the tool results are fed back.
@@ -37,6 +42,7 @@ const (
 
 // StreamEvent is a single event in a StreamWithTools stream.
 // For Type == StreamEventText, Token is set.
+// For Type == StreamEventReasoning, Token is set (reasoning text).
 // For Type == StreamEventToolCalls, ToolCalls is set.
 type StreamEvent struct {
 	Type      StreamEventType `json:"type"`

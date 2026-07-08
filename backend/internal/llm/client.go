@@ -56,18 +56,22 @@ func NewClient(provider, model, apiKey string) Client {
 		return &anthropicClient{model: model, apiKey: apiKey, http: &http.Client{Timeout: 120 * time.Second}}
 	default:
 		baseURL := "https://api.openai.com/v1"
+		isOllama := false
 		if provider == "ollama" {
 			baseURL = "http://localhost:11434/v1"
+			isOllama = true
 		}
-		return &openaiClient{model: model, apiKey: apiKey, baseURL: baseURL, http: &http.Client{Timeout: 120 * time.Second}}
+		return &openaiClient{model: model, apiKey: apiKey, baseURL: baseURL, isOllama: isOllama, http: &http.Client{Timeout: 120 * time.Second}}
 	}
 }
 
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
 type openaiClient struct {
-	model   string
-	apiKey  string
-	baseURL string
-	http    *http.Client
+	model    string
+	apiKey   string
+	baseURL  string
+	isOllama bool
+	http     *http.Client
 }
 
 type openaiChatRequest struct {
@@ -88,6 +92,7 @@ type openaiStreamChunk struct {
 	Choices []struct {
 		Delta struct {
 			Content   string `json:"content"`
+			Reasoning string `json:"reasoning"`
 			ToolCalls []struct {
 				Index    int    `json:"index"`
 				ID       string `json:"id"`
@@ -194,8 +199,77 @@ func wrapOpenAITools(tools []ToolDefinition) []openaiTool {
 	return out
 }
 
+// thinkParser processes Ollama content chunks for <think>...</think> blocks,
+// emitting reasoning events for text inside think blocks and text events for
+// text outside them. Tags split across chunk boundaries are handled by
+// retaining a safety buffer.
+type thinkParser struct {
+	buf     strings.Builder
+	inThink bool
+}
+
+const tagOpen = "<think>"
+const tagClose = "</think>"
+
+func (p *thinkParser) feed(chunk string, onText, onReasoning func(string) error) error {
+	p.buf.WriteString(chunk)
+	text := p.buf.String()
+
+	for {
+		if p.inThink {
+			idx := strings.Index(text, tagClose)
+			if idx < 0 {
+				safeLen := len(text) - len(tagClose) + 1
+				if safeLen > 0 {
+					if err := onReasoning(text[:safeLen]); err != nil {
+						return err
+					}
+				}
+				start := len(text) - len(tagClose) + 1
+				if start < 0 {
+					start = 0
+				}
+				p.buf.Reset()
+				p.buf.WriteString(text[start:])
+				return nil
+			}
+			if idx > 0 {
+				if err := onReasoning(text[:idx]); err != nil {
+					return err
+				}
+			}
+			text = text[idx+len(tagClose):]
+			p.inThink = false
+		} else {
+			idx := strings.Index(text, tagOpen)
+			if idx < 0 {
+				safeLen := len(text) - len(tagOpen) + 1
+				if safeLen > 0 {
+					if err := onText(text[:safeLen]); err != nil {
+						return err
+					}
+				}
+				start := len(text) - len(tagOpen) + 1
+				if start < 0 {
+					start = 0
+				}
+				p.buf.Reset()
+				p.buf.WriteString(text[start:])
+				return nil
+			}
+			if idx > 0 {
+				if err := onText(text[:idx]); err != nil {
+					return err
+				}
+			}
+			text = text[idx+len(tagOpen):]
+			p.inThink = true
+		}
+	}
+}
+
 // @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
-// @orkai:decision StreamWithTools implements the agentic tool-calling loop primitive. It sends tool definitions to the LLM (wrapped in the OpenAI {type:"function",function:{...}} wire format), streams text tokens to the caller, and accumulates tool_calls by index across SSE chunks. When finish_reason=="tool_calls", the final event carries the complete ToolCalls list. The caller (ChatHandler) executes the tools and feeds results back via a follow-up StreamWithTools call.
+// @orkai:decision StreamWithTools implements the agentic tool-calling loop primitive. It sends tool definitions to the LLM (wrapped in the OpenAI {type:"function",function:{...}} wire format), streams text tokens to the caller, and accumulates tool_calls by index across SSE chunks. When finish_reason=="tool_calls", the final event carries the complete ToolCalls list. The caller (ChatHandler) executes the tools and feeds results back via a follow-up StreamWithTools call. For Ollama, content deltas are parsed for <think>...</think> blocks that encode reasoning; for OpenAI, the reasoning field in the delta carries o-series reasoning summaries.
 func (c *openaiClient) StreamWithTools(ctx context.Context, systemPrompt string, messages []Message, tools []ToolDefinition, onEvent func(StreamEvent) error) error {
 	allMessages := make([]Message, 0, len(messages)+1)
 	allMessages = append(allMessages, Message{Role: "system", Content: systemPrompt})
@@ -245,6 +319,7 @@ func (c *openaiClient) StreamWithTools(ctx context.Context, systemPrompt string,
 	acc := make(map[int]*accTool)
 	var accOrder []int
 	var hasToolCalls bool
+	var tp thinkParser
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -272,9 +347,24 @@ func (c *openaiClient) StreamWithTools(ctx context.Context, systemPrompt string,
 		}
 		choice := chunk.Choices[0]
 
-		if choice.Delta.Content != "" {
-			if err := onEvent(StreamEvent{Type: StreamEventText, Token: choice.Delta.Content}); err != nil {
+		if choice.Delta.Reasoning != "" {
+			if err := onEvent(StreamEvent{Type: StreamEventReasoning, Token: choice.Delta.Reasoning}); err != nil {
 				return err
+			}
+		}
+
+		if choice.Delta.Content != "" {
+			if c.isOllama {
+				if err := tp.feed(choice.Delta.Content,
+					func(s string) error { return onEvent(StreamEvent{Type: StreamEventText, Token: s}) },
+					func(s string) error { return onEvent(StreamEvent{Type: StreamEventReasoning, Token: s}) },
+				); err != nil {
+					return err
+				}
+			} else {
+				if err := onEvent(StreamEvent{Type: StreamEventText, Token: choice.Delta.Content}); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -300,6 +390,9 @@ func (c *openaiClient) StreamWithTools(ctx context.Context, systemPrompt string,
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("llm.openaiClient.StreamWithTools: scan: %w", err)
 	}
+
+	// Flush any residual text buffered in the think parser.
+	_ = tp.feed("", func(string) error { return nil }, func(string) error { return nil })
 
 	if hasToolCalls {
 		toolCalls := make([]ToolCall, 0, len(accOrder))
