@@ -33,6 +33,7 @@ type chatMessage struct {
 
 type chatStreamEvent struct {
 	Token      string          `json:"token,omitempty"`
+	Reasoning  string          `json:"reasoning,omitempty"`
 	Done       bool            `json:"done,omitempty"`
 	Error      string          `json:"error,omitempty"`
 	ToolCall   *chatToolCall   `json:"toolCall,omitempty"`
@@ -85,6 +86,8 @@ func toChatStreamEvent(ev services.AgentEvent) chatStreamEvent {
 	switch ev.Type {
 	case services.AgentEventText:
 		return chatStreamEvent{Token: ev.Token}
+	case services.AgentEventReasoning:
+		return chatStreamEvent{Reasoning: ev.Token}
 	case services.AgentEventToolCall:
 		return chatStreamEvent{ToolCall: &chatToolCall{
 			ID: ev.ToolCall.ID, Name: ev.ToolCall.Name, Args: ev.ToolCall.Args,

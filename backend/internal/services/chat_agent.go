@@ -42,6 +42,7 @@ type AgentEventType string
 
 const (
 	AgentEventText       AgentEventType = "token"
+	AgentEventReasoning  AgentEventType = "reasoning"
 	AgentEventToolCall   AgentEventType = "toolCall"
 	AgentEventToolResult AgentEventType = "toolResult"
 	AgentEventDone       AgentEventType = "done"
@@ -92,6 +93,8 @@ func (s *ChatAgentService) Run(ctx context.Context, opportunityID string, messag
 			case llm.StreamEventText:
 				fullText.WriteString(ev.Token)
 				return onEvent(AgentEvent{Type: AgentEventText, Token: ev.Token})
+			case llm.StreamEventReasoning:
+				return onEvent(AgentEvent{Type: AgentEventReasoning, Token: ev.Token})
 			case llm.StreamEventToolCalls:
 				toolCalls = ev.ToolCalls
 			}
@@ -151,6 +154,9 @@ func (s *ChatAgentService) Run(ctx context.Context, opportunityID string, messag
 	return s.client.StreamWithTools(ctx, systemPrompt, messages, nil, func(ev llm.StreamEvent) error {
 		if ev.Type == llm.StreamEventText {
 			return onEvent(AgentEvent{Type: AgentEventText, Token: ev.Token})
+		}
+		if ev.Type == llm.StreamEventReasoning {
+			return onEvent(AgentEvent{Type: AgentEventReasoning, Token: ev.Token})
 		}
 		return nil
 	})

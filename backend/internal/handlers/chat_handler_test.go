@@ -104,6 +104,62 @@ func (r *fakeToolRegistry) Execute(ctx context.Context, call llm.ToolCall) (stri
 	return r.result, nil
 }
 
+func TestToChatStreamEvent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		ev   services.AgentEvent
+		want chatStreamEvent
+	}{
+		{
+			name: "text event",
+			ev:   services.AgentEvent{Type: services.AgentEventText, Token: "hello"},
+			want: chatStreamEvent{Token: "hello"},
+		},
+		{
+			name: "reasoning event",
+			ev:   services.AgentEvent{Type: services.AgentEventReasoning, Token: "let me think"},
+			want: chatStreamEvent{Reasoning: "let me think"},
+		},
+		{
+			name: "tool call event",
+			ev: services.AgentEvent{
+				Type:     services.AgentEventToolCall,
+				ToolCall: &services.AgentToolCall{ID: "call_1", Name: "shell", Args: `{"cmd":"ls"}`},
+			},
+			want: chatStreamEvent{ToolCall: &chatToolCall{ID: "call_1", Name: "shell", Args: `{"cmd":"ls"}`}},
+		},
+		{
+			name: "tool result event",
+			ev: services.AgentEvent{
+				Type:       services.AgentEventToolResult,
+				ToolResult: &services.AgentToolResult{ID: "call_1", Output: "ok"},
+			},
+			want: chatStreamEvent{ToolResult: &chatToolResult{ID: "call_1", Output: "ok"}},
+		},
+		{
+			name: "unknown event type",
+			ev:   services.AgentEvent{Type: services.AgentEventType("unknown")},
+			want: chatStreamEvent{},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := toChatStreamEvent(tt.ev)
+			if got.Token != tt.want.Token {
+				t.Errorf("Token: got %q, want %q", got.Token, tt.want.Token)
+			}
+			if got.Reasoning != tt.want.Reasoning {
+				t.Errorf("Reasoning: got %q, want %q", got.Reasoning, tt.want.Reasoning)
+			}
+		})
+	}
+}
+
 func TestChatHandlerStream(t *testing.T) {
 	t.Parallel()
 
