@@ -139,9 +139,9 @@ func Run() error {
 
 	orkaiClient := orkai.NewOrkaiClient(cfg.OrkaiMCPURL, cfg.OrkaiMCPToken)
 	shellSvc := services.NewShellService()
-	orkaiSearchSvc := services.NewOrkaiSearchService(orkaiClient)
+	orkaiSearchSvc := services.NewOrkaiSearchService(orkaiClient, onboardingStore)
 	toolsSvc := services.NewToolsService(shellSvc, orkaiSearchSvc, profileSvc)
-	toolRegistry := services.NewToolRegistry(shellSvc, orkaiClient, profileSvc, artifactSvc)
+	toolRegistry := services.NewToolRegistry(shellSvc, orkaiClient, onboardingStore, profileSvc, artifactSvc)
 	toolsHandler := handlers.NewToolsHandler(toolsSvc)
 	v1.POST("/tools/shell", toolsHandler.Shell)
 	v1.POST("/tools/orkai-search", toolsHandler.OrkaiSearch)

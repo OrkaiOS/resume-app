@@ -13,6 +13,7 @@ import (
 	"github.com/marco/resume-app/internal/llm"
 	"github.com/marco/resume-app/internal/models"
 	"github.com/marco/resume-app/internal/orkai"
+	"github.com/marco/resume-app/internal/store"
 )
 
 // ShellResult is the output of a single shell command execution.
@@ -97,12 +98,13 @@ func (s *ShellService) Execute(ctx context.Context, command, language string) (S
 
 // OrkaiSearchService searches the orkai workspace for documents.
 type OrkaiSearchService struct {
-	client *orkai.OrkaiClient
+	client          *orkai.OrkaiClient
+	onboardingStore store.OnboardingStore
 }
 
 // NewOrkaiSearchService creates an OrkaiSearchService.
-func NewOrkaiSearchService(client *orkai.OrkaiClient) *OrkaiSearchService {
-	return &OrkaiSearchService{client: client}
+func NewOrkaiSearchService(client *orkai.OrkaiClient, onboardingStore store.OnboardingStore) *OrkaiSearchService {
+	return &OrkaiSearchService{client: client, onboardingStore: onboardingStore}
 }
 
 // Search calls the orkai MCP search_document tool and returns the
@@ -111,7 +113,14 @@ func (s *OrkaiSearchService) Search(ctx context.Context, query string) (string, 
 	if query == "" {
 		return "", fmt.Errorf("services.OrkaiSearchService.Search: empty query")
 	}
-	return s.client.SearchDocuments(ctx, query)
+	state, err := s.onboardingStore.Get(ctx)
+	if err != nil {
+		return "", fmt.Errorf("services.OrkaiSearchService.Search: getting category ID: %w", err)
+	}
+	if state.OrkaiCategoryID == "" {
+		return "", fmt.Errorf("services.OrkaiSearchService.Search: orkai category not configured")
+	}
+	return s.client.SearchDocuments(ctx, query, state.OrkaiCategoryID)
 }
 
 // ToolRegistry implements llm.ToolRegistry by wiring the shell, orkai
@@ -128,10 +137,10 @@ type ToolRegistry struct {
 }
 
 // NewToolRegistry builds a ToolRegistry wiring all four tool services.
-func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, profile *ProfileService, artifacts *ArtifactService) *ToolRegistry {
+func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboardingStore store.OnboardingStore, profile *ProfileService, artifacts *ArtifactService) *ToolRegistry {
 	return &ToolRegistry{
 		shell:     shell,
-		search:    NewOrkaiSearchService(orkaiClient),
+		search:    NewOrkaiSearchService(orkaiClient, onboardingStore),
 		profile:   profile,
 		artifacts: artifacts,
 		defs: []llm.ToolDefinition{

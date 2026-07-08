@@ -62,7 +62,7 @@ func TestShellServiceNonZeroExitCode(t *testing.T) {
 
 func TestToolRegistryExecuteShell(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
 
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "1",
@@ -83,7 +83,7 @@ func TestToolRegistryExecuteShell(t *testing.T) {
 
 func TestToolRegistryUnknownTool(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "2",
 		Name:      "unknown_tool",
@@ -99,7 +99,7 @@ func TestToolRegistryUnknownTool(t *testing.T) {
 
 func TestToolRegistryDefinitionsCount(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
 	defs := registry.Definitions()
 	if len(defs) != 6 {
 		t.Errorf("expected 6 tool definitions, got %d", len(defs))
