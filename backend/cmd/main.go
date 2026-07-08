@@ -137,12 +137,21 @@ func Run() error {
 	v1.GET("/tools/artifacts/:id", artifactHandler.Get)
 	v1.DELETE("/tools/artifacts/:id", artifactHandler.Delete)
 
+	orkaiClient := orkai.NewOrkaiClient(cfg.OrkaiMCPURL, cfg.OrkaiMCPToken)
+	shellSvc := services.NewShellService()
+	orkaiSearchSvc := services.NewOrkaiSearchService(orkaiClient)
+	toolsSvc := services.NewToolsService(shellSvc, orkaiSearchSvc, profileSvc)
+	toolRegistry := services.NewToolRegistry(shellSvc, orkaiClient, profileSvc, artifactSvc)
+	toolsHandler := handlers.NewToolsHandler(toolsSvc)
+	v1.POST("/tools/shell", toolsHandler.Shell)
+	v1.POST("/tools/orkai-search", toolsHandler.OrkaiSearch)
+	v1.GET("/tools/profile", toolsHandler.Profile)
+
 	onboardingHandler := handlers.NewOnboardingHandler(onboardingSvc)
 	v1.POST("/onboarding/llm-config", onboardingHandler.SaveLLMConfig)
 	v1.POST("/onboarding/profile", onboardingHandler.SaveProfile)
 	v1.GET("/onboarding/status", onboardingHandler.GetStatus)
 
-	orkaiClient := orkai.NewOrkaiClient(cfg.OrkaiMCPURL, cfg.OrkaiMCPToken)
 	orkaiSetupSvc := services.NewOrkaiSetupService(orkaiClient, onboardingStore)
 	orkaiSetupHandler := handlers.NewOrkaiSetupHandler(orkaiSetupSvc, profileSvc)
 	v1.POST("/onboarding/orkai-setup", orkaiSetupHandler.StartSetup)
@@ -151,7 +160,8 @@ func Run() error {
 	systemPromptSvc := services.NewSystemPromptService(onboardingStore, profileStore, opportunityStore, orkaiClient)
 
 	llmClient := createLLMClient(cfg, onboardingStore)
-	chatHandler := handlers.NewChatHandler(llmClient, systemPromptSvc)
+	chatAgent := services.NewChatAgentService(llmClient, systemPromptSvc, toolRegistry)
+	chatHandler := handlers.NewChatHandler(chatAgent)
 	v1.POST("/chat", chatHandler.Stream)
 
 	if hasFrontendFS {

@@ -68,10 +68,23 @@ export function createChatAdapter(opportunityId: string | null): ChatModelAdapte
             if (!line.startsWith("data: ")) continue
             const json = line.slice(6)
             try {
-              const event: { token?: string; done?: boolean; error?: string } =
-                JSON.parse(json)
+              const event: {
+                token?: string
+                done?: boolean
+                error?: string
+                toolCall?: unknown
+                toolResult?: unknown
+              } = JSON.parse(json)
               if (event.error) {
                 throw new Error(event.error)
+              }
+              // FR-032: toolCall and toolResult events are emitted by
+              // the backend during the agentic tool-calling loop. They
+              // don't produce visible text; the agent's final text
+              // response describes what happened. A later slice will
+              // render these as UI badges.
+              if (event.toolCall || event.toolResult) {
+                continue
               }
               if (event.token) {
                 fullText += event.token

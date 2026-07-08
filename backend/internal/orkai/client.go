@@ -293,6 +293,31 @@ func (c *OrkaiClient) GetEntity(ctx context.Context, id string) (EntityResponse,
 	return r, nil
 }
 
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision SearchDocuments calls the orkai MCP search_document tool and returns the formatted results string. Used by the agent's orkai_search tool to discover additional context beyond the system prompt.
+func (c *OrkaiClient) SearchDocuments(ctx context.Context, query string) (string, error) {
+	if err := c.connect(); err != nil {
+		return "", err
+	}
+
+	result, err := c.callTool(ctx, "search_document", map[string]interface{}{
+		"query": query,
+	})
+	if err != nil {
+		return "", fmt.Errorf("orkai.SearchDocuments: %w", err)
+	}
+
+	// search_document returns a text content item with the results.
+	// Unwrap the MCP content envelope if present, otherwise return raw.
+	var raw string
+	if err := json.Unmarshal(result, &raw); err == nil {
+		return raw, nil
+	}
+	// If it's not a plain string, return the raw JSON — the agent can
+	// read either.
+	return string(result), nil
+}
+
 func (c *OrkaiClient) LinkEntities(ctx context.Context, sourceID, targetID string) error {
 	if err := c.connect(); err != nil {
 		return err

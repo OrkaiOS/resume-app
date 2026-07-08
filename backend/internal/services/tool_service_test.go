@@ -1,0 +1,107 @@
+package services
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/marco/resume-app/internal/llm"
+)
+
+func TestShellServiceExecuteBash(t *testing.T) {
+	t.Parallel()
+	svc := NewShellService()
+	result, err := svc.Execute(context.Background(), "echo hello", "bash")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.Stdout == "" {
+		t.Fatalf("expected stdout, got empty")
+	}
+	if !strings.Contains(result.Stdout, "hello") {
+		t.Errorf("expected stdout to contain 'hello', got %q", result.Stdout)
+	}
+	if result.ExitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", result.ExitCode)
+	}
+}
+
+func TestShellServiceExecutePython(t *testing.T) {
+	t.Parallel()
+	svc := NewShellService()
+	result, err := svc.Execute(context.Background(), "print('py-hello')", "python")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(result.Stdout, "py-hello") {
+		t.Errorf("expected stdout to contain 'py-hello', got %q", result.Stdout)
+	}
+}
+
+func TestShellServiceEmptyCommand(t *testing.T) {
+	t.Parallel()
+	svc := NewShellService()
+	_, err := svc.Execute(context.Background(), "", "bash")
+	if err == nil {
+		t.Fatal("expected error on empty command, got nil")
+	}
+}
+
+func TestShellServiceNonZeroExitCode(t *testing.T) {
+	t.Parallel()
+	svc := NewShellService()
+	result, err := svc.Execute(context.Background(), "exit 7", "bash")
+	if err != nil {
+		t.Fatalf("expected no Go error on non-zero exit, got %v", err)
+	}
+	if result.ExitCode != 7 {
+		t.Errorf("expected exit code 7, got %d", result.ExitCode)
+	}
+}
+
+func TestToolRegistryExecuteShell(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil)
+
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "1",
+		Name:      "shell",
+		Arguments: `{"command":"echo tool","language":"bash"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	var result ShellResult
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("expected JSON shell result, parse error: %v", err)
+	}
+	if !strings.Contains(result.Stdout, "tool") {
+		t.Errorf("expected stdout to contain 'tool', got %q", result.Stdout)
+	}
+}
+
+func TestToolRegistryUnknownTool(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "2",
+		Name:      "unknown_tool",
+		Arguments: `{}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error on unknown tool, got %v", err)
+	}
+	if !strings.Contains(out, "unknown tool") {
+		t.Errorf("expected 'unknown tool' in output, got %q", out)
+	}
+}
+
+func TestToolRegistryDefinitionsCount(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil)
+	defs := registry.Definitions()
+	if len(defs) != 6 {
+		t.Errorf("expected 6 tool definitions, got %d", len(defs))
+	}
+}
