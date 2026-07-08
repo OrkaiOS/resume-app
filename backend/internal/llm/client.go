@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type Message struct {
@@ -211,6 +212,16 @@ type thinkParser struct {
 const tagOpen = "<think>"
 const tagClose = "</think>"
 
+// runeBoundary returns the greatest byte index <= n that is a valid
+// UTF-8 rune start, ensuring that s[:result] does not split a multi-byte
+// character.
+func runeBoundary(s string, n int) int {
+	for n > 0 && n < len(s) && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return n
+}
+
 func (p *thinkParser) feed(chunk string, onText, onReasoning func(string) error) error {
 	p.buf.WriteString(chunk)
 	text := p.buf.String()
@@ -219,13 +230,13 @@ func (p *thinkParser) feed(chunk string, onText, onReasoning func(string) error)
 		if p.inThink {
 			idx := strings.Index(text, tagClose)
 			if idx < 0 {
-				safeLen := len(text) - len(tagClose) + 1
+				safeLen := runeBoundary(text, len(text)-len(tagClose)+1)
 				if safeLen > 0 {
 					if err := onReasoning(text[:safeLen]); err != nil {
 						return err
 					}
 				}
-				start := len(text) - len(tagClose) + 1
+				start := runeBoundary(text, len(text)-len(tagClose)+1)
 				if start < 0 {
 					start = 0
 				}
@@ -243,13 +254,13 @@ func (p *thinkParser) feed(chunk string, onText, onReasoning func(string) error)
 		} else {
 			idx := strings.Index(text, tagOpen)
 			if idx < 0 {
-				safeLen := len(text) - len(tagOpen) + 1
+				safeLen := runeBoundary(text, len(text)-len(tagOpen)+1)
 				if safeLen > 0 {
 					if err := onText(text[:safeLen]); err != nil {
 						return err
 					}
 				}
-				start := len(text) - len(tagOpen) + 1
+				start := runeBoundary(text, len(text)-len(tagOpen)+1)
 				if start < 0 {
 					start = 0
 				}
