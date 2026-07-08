@@ -335,9 +335,28 @@ Acceptance criteria:
 - The chat UI is built with assistant-ui primitives (Thread, Composer, Message) styled with Tailwind CSS + shadcn/ui
 - Messages support markdown rendering (headings, lists, bold, italic, links)
 - The agent's responses stream incrementally (tokens appear as they are generated)
-- User can stop a streaming response
 - Chat input supports multi-line text (Shift+Enter for newline, Enter to send)
 - The system prompt that configures the agent is pre-loaded from orkai (FR-031)
+
+**Stop:**
+
+- A **Stop** button is always visible during an active agent turn (streaming
+  or tool-calling). Clicking it cancels the in-flight LLM call and any running
+  tool execution immediately.
+- On Stop, the partial assistant message remains visible but is marked
+  "stopped" (visual indicator). The agent fires `update_session` (FR-039) with
+  the current session summary plus an `interrupted_at` marker recording: the
+  last user message, the last visible assistant text, whether the stop happened
+  mid-LLM-call or mid-tool-execution, and the iteration count.
+- There is no Continue button. The user simply types a new message after
+  stopping — explaining why they stopped, sharing corrections, or redirecting
+  the agent. The new message supersedes the stopped work; the agent handles it
+  naturally with the prior session context loaded via `overview` (FR-034).
+- The `interrupted_at` marker is preserved in the orkai session so that the
+  next time the user opens a chat for this opportunity, the agent (via
+  `overview` at session start) sees the prior conversation was interrupted and
+  has context for what happened. Stop works across browser sessions: closing
+  the tab after Stop preserves the marker in the orkai session.
 
 #### FR-031 — Agent System Prompt (P0)
 
@@ -350,7 +369,14 @@ Acceptance criteria:
   - The user's canonical profile standard from orkai (the authoritative source — when any uploaded file or older document disagrees, the profile standard wins)
   - The cover letter writing principles standard from orkai (content rules, tone, anti-patterns, pre-submission checklist)
   - The PDF generation skill from orkai (the step-by-step how-to for producing PDFs)
-  - A mandatory rule: "You must use the provided sources. Do not assume or fabricate information. Every claim must be traceable to the profile, the job description, or the writing principles."
+  - The **User Insights** standard from orkai, if it exists (durable user-specific
+    guidance captured by the agent via the `save_user_insight` tool —
+    FR-032 — such as tone preferences, career narrative, accessibility needs,
+    naming preferences). This standard is the single place where long-lived
+    user guidance lives and is updated over time; it is never duplicated.
+  - A mandatory rule: "You must use the provided sources. Do not assume or
+    fabricate information. Every claim must be traceable to the profile, the job
+    description, the User Insights, or the writing principles."
 - The system prompt is assembled per-session and is never hardcoded in the frontend
 - If orkai data has changed since last session, the prompt reflects the latest versions
 - The agent is instructed to retrieve additional context via the orkai search tool (FR-032) when the system prompt alone is insufficient
@@ -385,6 +411,53 @@ The agent has access to the following tools via the backend API:
    - Searches the orkai workspace for standards, skills, and documents
    - Used by the agent to discover additional context beyond the system prompt
 
+5. **orkai Overview Tool**
+   - Calls orkai's `overview` operation scoped to the `personal` category
+   - Returns a limited view of: recent session summaries, available standards,
+     available skills — i.e. what orkai knows is available for this project
+   - This is the discovery mechanism the agent uses at session start (FR-034)
+     and whenever it needs to know "what sessions exist for this opportunity"
+     or "what standards/skills can I draw on" without a free-text search
+
+6. **Session Save/Update Tool**
+   - `save_session`: creates a new orkai `session` entity in the `personal`
+     category, linked to the opportunity via metadata (opportunityId, company,
+     role, date). The content is a **distilled summary** — what was discussed,
+     what was decided, what tone/style guidance emerged, what draft was
+     produced, what's pending — NOT a transcript of raw messages.
+   - `update_session`: updates an existing session by ID when a new checkpoint
+     is reached in the same conversation (draft revised, concern resolved, new
+     durable context shared). The agent retrieves the existing session ID first
+     (via `overview`) and updates it; it never creates duplicate sessions for
+     the same conversation arc.
+   - The agent proactively calls `save_session`/`update_session` at meaningful
+     checkpoints: after resolving a user concern, after producing a draft, after
+     a revision, after the user shares durable context. It also fires
+     `update_session` on Stop (FR-030) with an `interrupted_at` marker.
+   - Multiple sessions per opportunity are allowed over time (the agent creates
+     a new one when the conversation topic shifts significantly — e.g. resume
+     vs. cover letter vs. interview prep).
+   - The tool surfaces a confirmation in chat when it saves: "Session saved to
+     orkai" (or words to that effect).
+
+7. **User Insight Capture Tool**
+   - `save_user_insight`: create-or-update a **single** standard named
+     `User Insights — Resume & Cover Letter` in the `personal` orkai category.
+     If the standard already exists, the tool **updates** it (merge/append new
+     insights); it never creates duplicates.
+   - The agent identifies user-revealed information with lasting relevance:
+     tone/style preferences, career narrative, constraints (e.g. age-bias
+     mitigation framing: "always learning, adapting, team-player"),
+     accessibility needs, naming preferences.
+   - The agent proactively calls this tool when the user shares something
+     durable and confirms in chat: "Saved as a user insight for future
+     sessions."
+   - The resulting standard is loaded into the system prompt at session start
+     (FR-031) so every future cover letter and resume inherits user guidance
+     without the user re-pasting it.
+   - The standard is human-editable in orkai directly (the user can refine or
+     remove insights outside the chat).
+
 #### FR-033 — Artifact Creation Trigger (P1)
 
 **As a** User, **I want** scripts that produced a successful result to be saved
@@ -401,26 +474,52 @@ Acceptance criteria:
 #### FR-034 — Chat Session Lifecycle (P0)
 
 **As a** User, **I want to** start a fresh chat session when editing an
-opportunity, **so that** the agent has the right context without stale
-conversation history.
+opportunity that nonetheless carries forward what the agent learned in prior
+sessions for that opportunity, **so that** the agent has continuity of learning
+without replaying stale raw conversation.
 
 Acceptance criteria:
 - "Open Agent" from an opportunity card starts a new chat session
-- The session is preloaded with: the user's profile data, the opportunity details (company, role, date), and any existing resume/cover letter documents for that opportunity
-- Sessions are identified by opportunity ID — at most one active session per opportunity
-- Opening a previously-edited opportunity starts a new session (no conversation history is retained per FR-035)
+- At session start the agent calls the `overview` tool (FR-032) scoped to the
+  `personal` category and retrieves prior session summaries for this
+  opportunity. It uses them as continuity context — what was discussed, what was
+  decided, what drafts were produced, what's pending, what user insights
+  emerged. Raw chat messages are never replayed.
+- The session is preloaded with: the user's profile data, the opportunity
+  details (company, role, date), any existing resume/cover letter documents for
+  that opportunity, **AND prior session summaries for this opportunity** loaded
+  via `overview`.
+- Sessions are identified by opportunity ID — at most one active session per
+  opportunity at a time, but multiple sessions accumulate over the opportunity's
+  lifetime (the agent creates a new one when the conversation topic shifts
+  significantly).
+- Opening a previously-edited opportunity starts a new chat session that loads
+  prior session summaries (above). Raw chat messages are never retained
+  (FR-035).
 - The chat UI displays the opportunity context (company + role) prominently
 
-#### FR-035 — No Conversation History Persistence (P0)
+#### FR-035 — Distilled Session Persistence, Ephemeral Raw Messages (P0)
 
-**As a** User, **I want** only the final documents to be saved, **so that** my
-storage stays clean and the agent always starts fresh with current data.
+**As a** User, **I want** raw chat messages to stay ephemeral while the agent
+preserves a distilled summary of each conversation to orkai, **so that** my
+storage stays clean AND the agent compounds learning across sessions.
 
 Acceptance criteria:
-- Chat messages are ephemeral — they are NOT persisted across sessions
-- Closing the browser or navigating away discards the conversation
-- Only approved documents (resume PDF, cover letter PDF) are persisted to the database
-- Draft markdown content is persisted only while the session is active (in-memory or temporary storage)
+- Raw chat messages are NOT persisted — closing the browser or navigating away
+  discards the live transcript. The chat UI holds messages in memory only for
+  the duration of the active session.
+- At meaningful checkpoints the agent saves a distilled session summary to
+  orkai via `save_session`/`update_session` (FR-039). The summary is the value
+  of the conversation — what was discussed, decided, and produced — not the
+  raw messages.
+- On Stop (FR-030) the agent fires `update_session` with an `interrupted_at`
+  marker so a subsequent Continue can resume.
+- Only approved documents (resume PDF, cover letter PDF) and distilled session
+  summaries are persisted. Draft markdown content is persisted only while the
+  session is active (in-memory or temporary storage).
+- Prior session summaries are loaded at the start of the next session for the
+  same opportunity via `overview` (FR-034), giving the agent continuity without
+  raw-message replay.
 
 #### FR-036 — Cover Letter Writing Rules (P0)
 
@@ -482,6 +581,61 @@ Acceptance criteria:
 - Future chat sessions include these documents in the agent's searchable context via the orkai search tool
 - This creates a compounding effect: each generation improves the next by grounding the agent in the user's actual accepted output
 - If orkai is unreachable during write-back, the operation fails gracefully — the document is still stored locally and write-back is retried on the next orkai health check
+
+#### FR-038 — Reasoning Stream Visibility (P0)
+
+**As a** User, **I want to** see the agent's reasoning in real time while it
+works, **so that** I understand what it is thinking, why it makes choices, and
+can catch misdirection early — especially during long cover-letter shaping.
+
+Acceptance criteria:
+- The chat streams the model's reasoning (chain-of-thought / thinking tokens)
+  alongside the final answer tokens, when the configured LLM provider exposes
+  them:
+  - Ollama reasoning models emit `<think>…</think>` blocks
+  - OpenAI o-series emit reasoning summary content
+  - Anthropic exposes extended thinking blocks
+- Reasoning renders in a collapsible "Thinking…" block above the answer,
+  expanded by default while streaming, collapsible after the turn completes
+- Tool calls and tool results (currently silently dropped per the FR-032
+  implementation) are surfaced as inline badges with the tool name and a
+  one-line result summary, so the user sees `shell · weasyprint` etc. in real
+  time
+- If the provider emits no reasoning tokens, the "Thinking…" block is hidden —
+  no empty placeholder is shown
+- Reasoning text is display-only: it is NOT included in the message content sent
+  back to the LLM on the next turn
+
+#### FR-039 — Session Save/Update Agent Tool (P0)
+
+**As the** agent, **I want to** save and update orkai session summaries during
+a chat, **so that** the learning result of each conversation is preserved and
+available to future sessions for the same opportunity.
+
+Acceptance criteria:
+- Two agent tools: `save_session` (create) and `update_session` (update by ID),
+  exposed in the FR-032 tool registry
+- The agent proactively calls `save_session` at the first meaningful checkpoint
+  of a new conversation and `update_session` at subsequent checkpoints. A
+  checkpoint is reached when: a user concern is resolved, a draft is produced, a
+  revision is applied, the user shares durable context, or the user clicks Stop
+  (FR-030)
+- The session content is a **distilled summary** — what was discussed, what was
+  decided, what tone/style guidance emerged, what draft was produced, what's
+  pending — NOT a transcript of raw messages
+- The session is stored as an orkai `session` entity in the `personal` category
+  and linked to the opportunity via metadata (opportunityId, company, role,
+  date)
+- `update_session` is used when a session already exists for the current
+  conversation arc; the agent retrieves the existing session ID via `overview`
+  (FR-032) first. It never creates duplicate sessions for the same arc
+- Multiple sessions per opportunity are allowed over time — the agent creates a
+  new `save_session` when the conversation topic shifts significantly (resume
+  vs. cover letter vs. interview prep)
+- On Stop (FR-030) the agent fires `update_session` with an `interrupted_at`
+  marker so a subsequent Continue (FR-030) can resume from the checkpoint
+- The tool surfaces a confirmation in chat when it saves: "Session saved to
+  orkai" (or words to that effect)
 
 ---
 
@@ -918,19 +1072,20 @@ Database stores:
 | 0.2.0 | 2026-07-05 | — | Complete rewrite — agentic chat-first architecture with orkai MCP integration |
 | 0.2.1 | 2026-07-05 | — | Refinement — expanded onboarding with 7 orkai entities, added cover letter writing rules (FR-036), added accepted document write-back to orkai (FR-037), specified pandoc+weasyprint PDF pipeline with CSS tuning, added authoritative profile source rule |
 | 0.2.2 | 2026-07-06 | — | Refinement — documented assistant-ui as the chat frontend framework (FR-030), added design constraint in §2.4, added reference in §1.4 |
+| 0.2.3 | 2026-07-07 | — | Discovery — added FR-038 (reasoning stream visibility, P0), FR-039 (session save/update agent tool, P0); refined FR-030 (Stop & Continue with session checkpoint), FR-031 (load User Insights standard into system prompt), FR-032 (overview tool, save_session/update_session, save_user_insight), FR-034 (overview-based continuity from prior session summaries), FR-035 (ephemeral raw messages + distilled session summary persistence); resolved Open Question #4 (tone captured dynamically as User Insights standard, not a fixed enum) |
 
 ### 6.2 Open Questions
 
 1. Should the app support multiple languages for the UI (i18n)? Currently assumed English-only.
 2. Should resume/profile data be exportable/importable via JSON Resume format (jsonresume.org) for interoperability?
 3. Should the agent support multiple LLM providers simultaneously (e.g., use Anthropic for writing, Ollama for quick tasks)?
-4. Should cover letters support a separate "tone" configuration (formal, conversational, enthusiastic)?
+4. ~~Should cover letters support a separate "tone" configuration (formal, conversational, enthusiastic)?~~ **Resolved in v0.2.3** — tone is captured dynamically as a User Insights standard (FR-032 `save_user_insight`, loaded into the system prompt by FR-031), not a fixed enum.
 5. What is the exact orkai MCP token collection mechanism across cursor, cline, and opencode — are the config file paths stable?
 
 ### 6.3 Priority Summary
 
 | Priority | Count | Key Items |
 |----------|-------|-----------|
-| P0 | 26 | `make run`, reverse proxy, orkai health gate, onboarding, opportunity cards, empty state, chat interface, agent system prompt, agent tools, chat session lifecycle, no conversation history, cover letter writing rules, draft mode, document buttons, review panel, approve button, PDF download links, PDF in new tab, revision loop, profile, opportunity, resume, cover letter data models, grayscale design, PDF export (resume + cover letter via pandoc+weasyprint), health/metrics, CORS, API key security, sandboxed shell, NFR-01–03 |
+| P0 | 28 | `make run`, reverse proxy, orkai health gate, onboarding, opportunity cards, empty state, chat interface (incl. Stop & Continue with session checkpoint), agent system prompt (incl. User Insights standard), agent tools (incl. overview, save_session/update_session, save_user_insight), chat session lifecycle (overview-based continuity), distilled session persistence (ephemeral raw + saved summary), cover letter writing rules, draft mode, document buttons, review panel, approve button, PDF download links, PDF in new tab, revision loop, profile, opportunity, resume, cover letter data models, grayscale design, PDF export (resume + cover letter via pandoc+weasyprint), reasoning stream visibility (FR-038), session save/update agent tool (FR-039), health/metrics, CORS, API key security, sandboxed shell, NFR-01–03 |
 | P1 | 12 | Global install, dev mode, onboarding progress, pagination, filters, search, sorting, artifact trigger, accepted document persistence to orkai, chat-based approval, thumbs up, artifact storage, Prometheus metrics, responsive layout, timestamps, keyboard shortcuts, form persistence |
 | P2 | 1 | Archive opportunity |
