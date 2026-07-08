@@ -42,7 +42,10 @@ const mandatorySourceRule = `
 2. The canonical profile is the single source of truth. When any user-uploaded
    file or older document disagrees with the profile, the profile wins.
 3. When the system prompt alone is insufficient, retrieve additional context
-   via the orkai search tool.`
+   from orkai:
+   - Use orkai_get(id) when you know the entity ID (listed with each source below).
+   - Use orkai_search(query) only when you do NOT have an ID and need to discover
+     relevant standards, skills, or documents by topic.`
 
 func (s *SystemPromptService) Build(ctx context.Context, opportunityID string) string {
 	var b strings.Builder
@@ -167,6 +170,7 @@ func (s *SystemPromptService) appendOrkaiSources(b *strings.Builder, ctx context
 		if err == nil && entity.Text != "" {
 			b.WriteString("\n\n## CANONICAL PROFILE (from orkai — authoritative source)\n\n")
 			b.WriteString(entity.Text)
+			b.WriteString(fmt.Sprintf("\n(orkai ID: %s)\n", state.CanonicalProfileStandardID))
 		}
 	}
 
@@ -175,6 +179,7 @@ func (s *SystemPromptService) appendOrkaiSources(b *strings.Builder, ctx context
 		if err == nil && entity.Text != "" {
 			b.WriteString("\n\n## COVER LETTER WRITING PRINCIPLES (from orkai)\n\n")
 			b.WriteString(entity.Text)
+			b.WriteString(fmt.Sprintf("\n(orkai ID: %s)\n", state.CoverLetterPrinciplesStandardID))
 		}
 	}
 
@@ -183,6 +188,7 @@ func (s *SystemPromptService) appendOrkaiSources(b *strings.Builder, ctx context
 		if err == nil && entity.Text != "" {
 			b.WriteString("\n\n## PDF GENERATION SKILL (from orkai)\n\n")
 			b.WriteString(entity.Text)
+			b.WriteString(fmt.Sprintf("\n(orkai ID: %s)\n", state.PDFGenerationSkillID))
 		}
 	}
 }

@@ -101,7 +101,7 @@ func TestToolRegistryDefinitionsCount(t *testing.T) {
 	t.Parallel()
 	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
 	defs := registry.Definitions()
-	if len(defs) != 6 {
-		t.Errorf("expected 6 tool definitions, got %d", len(defs))
+	if len(defs) != 7 {
+		t.Errorf("expected 7 tool definitions, got %d", len(defs))
 	}
 }

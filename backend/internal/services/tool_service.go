@@ -131,6 +131,7 @@ func (s *OrkaiSearchService) Search(ctx context.Context, query string) (string, 
 type ToolRegistry struct {
 	shell     *ShellService
 	search    *OrkaiSearchService
+	orkai     *orkai.OrkaiClient
 	profile   *ProfileService
 	artifacts *ArtifactService
 	defs      []llm.ToolDefinition
@@ -141,6 +142,7 @@ func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboar
 	return &ToolRegistry{
 		shell:     shell,
 		search:    NewOrkaiSearchService(orkaiClient, onboardingStore),
+		orkai:     orkaiClient,
 		profile:   profile,
 		artifacts: artifacts,
 		defs: []llm.ToolDefinition{
@@ -158,13 +160,24 @@ func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboar
 			},
 			{
 				Name:        "orkai_search",
-				Description: "Search the user's orkai workspace for standards, skills, and documents. Use this when the system prompt is insufficient and you need additional context about cover letter principles, PDF generation, or past accepted documents.",
+				Description: "Search the user's orkai workspace for standards, skills, and documents by semantic meaning. Use this when you do NOT already know the entity ID.",
 				Parameters: json.RawMessage(`{
   "type": "object",
   "properties": {
     "query": {"type": "string", "description": "Natural language search query"}
   },
   "required": ["query"]
+}`),
+			},
+			{
+				Name:        "orkai_get",
+				Description: "Fetch a specific orkai entity (standard, skill, or document) by its ID. Use this when the entity ID is known or referenced in the system prompt — it is faster and returns the exact entity. Prefer over orkai_search when you have an ID.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "id": {"type": "string", "description": "The orkai entity ID (UUID)"}
+  },
+  "required": ["id"]
 }`),
 			},
 			{
@@ -221,6 +234,8 @@ func (r *ToolRegistry) Execute(ctx context.Context, call llm.ToolCall) (string, 
 		return r.execShell(ctx, call.Arguments)
 	case "orkai_search":
 		return r.execSearch(ctx, call.Arguments)
+	case "orkai_get":
+		return r.execGetEntity(ctx, call.Arguments)
 	case "get_profile":
 		return r.execProfile(ctx)
 	case "list_artifacts":
@@ -261,6 +276,26 @@ func (r *ToolRegistry) execSearch(ctx context.Context, argsJSON string) (string,
 		return encodeJSON(map[string]string{"error": err.Error()})
 	}
 	return encodeJSON(map[string]string{"results": result})
+}
+
+func (r *ToolRegistry) execGetEntity(ctx context.Context, argsJSON string) (string, error) {
+	var args struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execGetEntity: parse args: %w", err)
+	}
+	if args.ID == "" {
+		return encodeJSON(map[string]string{"error": "id is required"})
+	}
+	if r.orkai == nil {
+		return encodeJSON(map[string]string{"error": "orkai client not configured"})
+	}
+	entity, err := r.orkai.GetEntity(ctx, args.ID)
+	if err != nil {
+		return encodeJSON(map[string]string{"error": err.Error()})
+	}
+	return encodeJSON(entity)
 }
 
 func (r *ToolRegistry) execProfile(ctx context.Context) (string, error) {
