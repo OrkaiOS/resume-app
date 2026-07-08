@@ -222,6 +222,23 @@ func runeBoundary(s string, n int) int {
 	return n
 }
 
+// flush emits any residual buffer with no safety margin. At
+// end-of-stream there is no next chunk that could complete a split
+// </think> or  tags, so the safety margin applied by feed() is wrong
+// here — it would retain up to len(tagOpen)-1 = 6 bytes and drop
+// the tail of every Ollama response (e.g. the final period).
+func (p *thinkParser) flush(onText, onReasoning func(string) error) error {
+	text := p.buf.String()
+	if text == "" {
+		return nil
+	}
+	p.buf.Reset()
+	if p.inThink {
+		return onReasoning(text)
+	}
+	return onText(text)
+}
+
 func (p *thinkParser) feed(chunk string, onText, onReasoning func(string) error) error {
 	p.buf.WriteString(chunk)
 	text := p.buf.String()
@@ -402,8 +419,16 @@ func (c *openaiClient) StreamWithTools(ctx context.Context, systemPrompt string,
 		return fmt.Errorf("llm.openaiClient.StreamWithTools: scan: %w", err)
 	}
 
-	// Flush any residual text buffered in the think parser.
-	_ = tp.feed("", func(string) error { return nil }, func(string) error { return nil })
+	// Flush any residual text buffered in the think parser. The callbacks
+	// MUST forward to onEvent — using no-ops here drops the last ~6 chars
+	// (the thinkParser safety buffer for split  tags) of every
+	// Ollama response.
+	if err := tp.flush(
+		func(s string) error { return onEvent(StreamEvent{Type: StreamEventText, Token: s}) },
+		func(s string) error { return onEvent(StreamEvent{Type: StreamEventReasoning, Token: s}) },
+	); err != nil {
+		return err
+	}
 
 	if hasToolCalls {
 		toolCalls := make([]ToolCall, 0, len(accOrder))
