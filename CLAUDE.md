@@ -1,4 +1,4 @@
-## orkai — Persistent Memory
+## orkai — Your Brain (READ THIS FIRST)
 
 orkai gives you persistent memory across sessions. Standards, skills, session
 summaries, and indexed source code are stored and semantically searchable.
@@ -16,6 +16,12 @@ globally and returns entities from unrelated projects.
 |-------|-------|
 | Project name | resume-app |
 | Category ID | `233276ae31223e19a727667e45c51d19` |
+| Source of truth | `.orkai.yaml` → `project.category_id` |
+
+Use `category_ids: ["233276ae31223e19a727667e45c51d19"]` when creating sessions,
+plans, or any scoped entity so work stays in this project. For `overview()`,
+pass `category_id` and `project_name` from `.orkai.yaml` when the MCP server
+cannot read the workspace (e.g. HTTP/SSE transports).
 
 **Scoping rules — apply on EVERY call:**
 
@@ -51,7 +57,7 @@ projects and break context; global creates orphan entities outside this
 project. `user_preferences` and `agent_preferences` are singletons and are
 intentionally global — do NOT scope those.
 
-### Session Startup
+### Session Startup — Do This FIRST
 
 1. **Call overview()** with `category_id: "233276ae31223e19a727667e45c51d19"`
    and `project_name: "resume-app"` — returns recent sessions (with text
@@ -67,38 +73,19 @@ intentionally global — do NOT scope those.
 
 3. **Check for open work** — scan the plan list for any plan whose
    `metadata.status` is not `done`. For each open plan, list its milestones
-   and tasks. Group pending/in-progress tasks by role workflow:
-   - For each open plan: `milestone(action: "list", plan_id: <id>, category_ids: [...])`
-   - For each milestone whose status ≠ done: `tasks(action: "list",
-     milestone_id: <id>, category_ids: [...])` and collect tasks whose
-     status is `pending` or `in_progress`.
-   - Group the collected tasks under one of these headings by which role
-     workflow the task body names (or by path: `backend/**` → Backend
-     Developer, `frontend/**` → Frontend Developer):
-       - **Backend Developer (resume-app)** `2840ff4a-179d-4551-b1d5-c39130533961`
-       - **Frontend Developer (resume-app)** `6aee46f4-e39c-4f21-bcbc-3916a49dd464`
-       - **Feature Planner (resume-app)** `f87a7d22-8429-459f-8196-63155021ae11`
-         (tasks here are "draft the plan" work, not implementation)
-       - **Architect (resume-app)** `8def40c2-89cc-47d2-ad16-dcf4adcc59a1`
-         (plan mode: before Feature Planner; review mode: after Developer)
-     - Tasks with no role-workflow assignment go under "Unassigned".
-   **Defer this step if the user already named a specific task or workflow**
-   — skip straight to step 4.
+   and tasks. Group pending/in-progress tasks by role workflow (see Role
+   Workflows table below for IDs). **Defer this step if the user already
+   named a specific task or workflow** — skip straight to step 4.
 
 4. **Brief the user**: summarize (a) what the latest session did, (b) current
-   project status and relevant decisions, and (c) open work if any. Then ask:
-   *"Which task should we start? Backend Developer / Frontend Developer /
-   Product Owner / something else?"* If there is no open work, ask what Marco
-   wants to do. Do NOT auto-start implementation — Marco picks the task; the
-   agent loads the matching role workflow via `workflow(action: "get", id: ...)`
-   and follows it.
+   project status, and (c) open work if any. Then ask: *"Which task should we
+   start?"* If there is no open work, ask what Marco wants to do. Do NOT
+   auto-start implementation — Marco picks the task; the agent loads the
+   matching role workflow via `workflow(action: "get", id: ...)` and follows it.
 
 **If the user triggers a specific workflow directly** (e.g. "Trigger the
 Fullstack"), skip the open-work scan and load that workflow immediately. The
 workflow's first steps will determine what to work on.
-
-If step 3 finds zero open plans/milestones/tasks, skip the grouped list and
-just brief + ask what Marco wants to do.
 
 ### Reusing Existing Plans and Tasks
 
@@ -115,13 +102,15 @@ milestone, and tasks already exist for the feature:
 Only create new plan > milestone > tasks when nothing exists for the feature
 yet (greenfield work).
 
-### During the Session
+### During the Session — Search Before Reading
 
-**Search before reading files.** Use
-`search_code(query, category_ids: ["233276ae31223e19a727667e45c51d19"])` to
-find code by meaning. It returns symbols with file paths, line numbers,
-signatures, and AI annotations. Only fall back to Grep/Read if search doesn't
-find what you need.
+**Code-first search**: When you need to find or understand code, use
+`search_code(query, category_ids: ["233276ae31223e19a727667e45c51d19"])` FIRST.
+It returns symbols with file paths, line numbers, signatures, and AI
+annotations. Only fall back to Grep/Read if search doesn't find what you need.
+For deep understanding of a specific symbol, use
+`annotations(action: "list", entity_id: "<id>")` or
+`entity(action: "get", id: "<id>", enrich: true)`.
 
 **Exception — task body already lists files**: When a task body (from the
 Feature Planner) already specifies exact file paths, signatures, and types,
@@ -135,31 +124,89 @@ map), run `orkai index .` in the workspace root BEFORE any `search_code` /
 single-file reads inside an already-scoped implementation task skip this —
 the role workflows perform their own scoped `search_code` and indexing.
 
-**Check standards before deciding.** Before architecture or pattern decisions:
-  standards(action: "search", query: "<topic>", category_ids: ["233276ae31223e19a727667e45c51d19"])
-  skills(action: "search", query: "<topic>", category_ids: ["233276ae31223e19a727667e45c51d19"])
-Follow them if they exist — they represent team-agreed conventions.
+**Document search**: `search_document(query)` with optional `doc_type?`
+(section/chunk), `category?`, `limit?` — returns the matching section or
+chunk, not the full parent.
 
-### Session End
+**Standards and skills**: Before architecture or pattern decisions:
+  1. `standards(action: "search", query: "<topic>", category_ids: ["233276ae31223e19a727667e45c51d19"])`
+  2. `skills(action: "search", query: "<topic>", category_ids: ["233276ae31223e19a727667e45c51d19"])`
+  3. Follow them if they exist — they represent team-agreed conventions.
+  4. If you establish a new pattern with no existing standard, suggest
+     creating one via `standards(action: "create", name: "...", text: "...")`.
+
+**Plans and work tracking**: use `plan`, `milestone`, and `tasks` (each
+with `action: "create" | "get" | "update" | "delete" | "list" | "search"`).
+Link milestones to a plan via `plan_id`, tasks to a milestone via
+`milestone_id` — both are sugar that translate to `child_of` relations on
+the wire. Filter list/search by `status` on milestones and tasks.
+
+**@orkai source tags** (indexed at orkai index): `@orkai:decision` for author
+intent; `@orkai:ref(id=...)` for graph edges to standards/skills/docs.
+Re-index after adding tags.
+
+**Text distribution**: long entity text is auto-split into parent → sections →
+chunks. Search returns the precise chunk/section; get on the parent returns
+full content.
+
+### Session End — Save and Re-index
 
 When the user signals the session is ending:
-1. Ask: "Would you like me to save this session?"
-2. If yes: `session(action: "create", name: "Session: <topic> - <date>",
+1. **Ask the user**: "Would you like me to save this session for future
+   reference?"
+2. If yes, create a session entity:
+   `session(action: "create", name: "Session: <topic> - <date>",
    text: "<what was done, what's pending, key decisions, files modified>",
    category_ids: ["233276ae31223e19a727667e45c51d19"])`
-3. Suggest running "orkai index" if source files were modified.
+3. **Update `docs/plan/MASTER_PLAN.md` (if it exists)** when milestones move
+   — check off completed tasks, add a `vNNN` Completed Milestones entry
+   when an entire milestone closes.
+4. **Re-index if needed**: if source files were modified during the session,
+   suggest running "orkai index" in the terminal to keep the code index fresh.
 
-### Tool Reference
+### MCP Tools — Full Reference
+
+#### Domain Tools (all follow: tool(action: "create"|"get"|"update"|"delete"|"list"|"search", ...))
+
+| Tool | Type | Description |
+|------|------|-------------|
+| session | session | Work session summaries. Extra action: "latest" |
+| standards | standard | Engineering guidelines |
+| skills | skill | Implementation patterns |
+| user_preferences | user_preferences | Singleton per user. `create` upserts; `get` without id resolves owner row. Body inlined by `overview()` |
+| agent_preferences | agent_preferences | Singleton per owner. `create` upserts; `get` without id resolves owner row. Inlined by `overview()` |
+| plan | plan | Roadmaps and project plans |
+| milestone | milestone | Milestones within a plan (child_of plan; sugar: `plan_id`; `status` filter) |
+| tasks | task | Actionable work items (child_of milestone; sugar: `milestone_id`; `status` filter) |
+| categories | — | Organize entities. Actions: create, list, delete, unindex; `parent_id` for nesting |
+| documents | document | Reference documents (auto-sectioned for search; `doc_type` filter) |
+| analytics | analytics | Tabular datasets. Actions: create, get, delete, list, search, schema, query, replace, append, delete_rows, clear; federated JOINs via `datasets` + `sql` |
+| annotations | annotation | Purpose + insight code annotations |
+| events | — | Entity mutation history. Action: list only |
+| workflow | workflow | Repeatable step-by-step practices with structured step graphs |
+
+#### Search Tools
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| search_code(query) | language?, file_pattern?, limit?, enrich?, include_annotations? | Semantic code search; default enrich=true |
+| search_document(query) | doc_type?, category?, limit? | Semantic document search (section/chunk) |
+
+#### Utility Tools
+
+| Tool | Description |
+|------|-------------|
+| overview() | Session briefing — entity counts, recent sessions, standards/skills, inlined user_preferences + agent_preferences |
+| help() | Full v2 tool reference with examples |
+| project_setup(action, target?, category_id?, project_name?) | Generate agent files. Targets: `orkai.yaml`, `agents.md`, `claude.md`, `cursor`. The `category_id` and `project_name` args fill the matching template placeholders. |
+| entity(action, ...) | Generic CRUD — escape hatch. Full `relations`, `exclude_type`, `origin_type` filters; bypasses singleton checks on purpose |
 
 Call `help()` for the full tool reference with examples. It covers all domain
-tools (session, standards, skills, preferences, plan/milestone/tasks,
-categories, documents, analytics, annotations, events, workflow), the search
-tools (search_code, search_document), the entity escape hatch, and utility
-tools (overview, help, project_setup).
+tools, the search tools, the entity escape hatch, and utility tools.
 
-### CLI Commands
+### CLI Commands (run via terminal)
 
-```
+```bash
 orkai init                       # project wizard
 orkai index                      # re-index (default: all)
 orkai index code|document|analytics
@@ -174,9 +221,9 @@ orkai index --annotations-only   # AI annotations for code
 orkai review                     # LLM code review against stored standards
 ```
 
-orkai review is a CLI code-review command: it reviews your changes against the
+`orkai review` is a CLI code-review command: it reviews your changes against the
 standards and architecture decisions stored in orkai, protecting source-code
-quality. Run "orkai review --help" or see docs/review.md.
+quality. Run `orkai review --help` or see docs/review.md.
 
 ## Restrictions
 
@@ -216,7 +263,7 @@ but branch-per-task is still required for traceability and clean rollback.
   `git branch -d feat/<milestone>-<task>-<slug>`.
 - **Never commit implementation work directly to `main`.** Only `docs`,
   `chore`, `config`, or `fix` changes that are NOT tied to an implementation
-  task may skip the branch rule (e.g. updating AGENTS.md, wiring
+  task may skip the branch rule (e.g. updating CLAUDE.md/AGENTS.md, wiring
   `.orkai.yaml`). When in doubt, branch.
 - The Developer workflows enforce this: "Create Branch" runs before
   "Implement Code", "Merge to Main" runs after all tests pass. The Feature
@@ -224,6 +271,12 @@ but branch-per-task is still required for traceability and clean rollback.
   workflow has a deterministic name to use.
 
 ### Build & Test Commands
+
+**Shell working directory**: Each Bash call starts fresh from the project
+root (`/Users/marco/opensource/resume-app`). Commands that need a specific
+subdirectory MUST `cd` at the start of the command:
+`cd /Users/marco/opensource/resume-app/backend && go build ./...`. Compound
+commands with `&&` keep the `cd` for the whole chain.
 
 Backend (run in `backend/`):
 ```
@@ -259,7 +312,7 @@ staged (glob-scoped per `lefthook.yml`).
 
 ### Role Workflows (lazy-load, trigger on matching task or intent)
 
-Six project-scoped role workflows own the full product lifecycle: from
+Five project-scoped role workflows own the full product lifecycle: from
 requirements through planning to implementation, plus a Fullstack fast-path.
 Each enforces its own standards, skills, test practice, and deterministic gates.
 Load the full steps with `workflow(action: "get", id: ...)` only when a task
@@ -273,7 +326,6 @@ onboarding.
 | Feature Planner (resume-app) | `f87a7d22-8429-459f-8196-63155021ae11` | Any new feature or significant change. Searches standards/skills/code, collects orkai entity IDs, drafts design, persists plan > milestone > tasks, updates `docs/plan/MASTER_PLAN.md`, presents for approval, STOP. | P4 plan persistence, task-body contract (standards IDs + role workflow per task) |
 | Backend Developer (resume-app) | `2840ff4a-179d-4551-b1d5-c39130533961` | Any implementation task touching `backend/**` (Go + Gin: handlers, services, models, middleware, store, cmd) | `go build`, `go vet`, `gofmt -l`, `go test` |
 | Frontend Developer (resume-app) | `6aee46f4-e39c-4f21-bcbc-3916a49dd464` | Any implementation task touching `frontend/**` (React + Vite + TS: components, pages, hooks, api, store, types, lib) | `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` |
-| Frontend QA (resume-app) | `0fc856e1-9fe3-446b-a2de-6ad6319e08e5` | QA task created by Frontend Developer after implementation that introduces or modifies UI. Receives a precise test script (URLs, elements, interactions, assertions) and executes Playwright browser tests against the running dev environment. | Zero console errors, all elements render, all interactions produce expected outcomes, all ACs satisfied |
 | Fullstack Developer (resume-app) | `10d6213a-0f71-4a45-8e50-b58b7243637f` | Marco wants a vertical feature slice shipped fast in one session. Combines lightweight planning + backend + frontend + self-QA. Coexists with the role pipeline — Marco picks Fullstack for speed on vertical slices, the role pipeline for risky/standards-heavy work. | All backend gates (`go build`, `go vet` zero output, `gofmt -l` zero files, `go test`) AND all frontend gates (`npm run lint` zero output, `npm run typecheck`, `npm run test`, `npm run build`) AND Playwright self-QA (no console errors, all ACs satisfied) |
 
 Two paths from requirements to merged code:
@@ -285,8 +337,7 @@ requirements to architecture (plan mode) and implementation back to standards
 milestone > tasks (how). The Developer workflows implement tasks with full gate
 enforcement and `annotations(create)` + `entity(update, relations)` linking new
 code to standards. Full lifecycle: Product Owner → Architect (plan) → Feature
-Planner → Backend/Frontend Developer → Frontend QA (when UI changed) →
-Architect (review).
+Planner → Backend/Frontend Developer → Architect (review).
 
 New features (role pipeline): Product Owner shapes requirements first →
 Architect (plan mode) establishes architecture and ensures standards coverage →
