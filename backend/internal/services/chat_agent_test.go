@@ -114,3 +114,102 @@ func TestChatAgentServiceRunWithToolCall(t *testing.T) {
 type fakeBuilder struct{}
 
 func (f *fakeBuilder) Build(ctx context.Context, opportunityID string) string { return "sys" }
+
+// fakeSessionSaver records calls to SaveInterrupted for test assertions.
+type fakeSessionSaver struct {
+	saved           bool
+	lastSessionID   string
+	lastInterrupted InterruptedAt
+}
+
+func (f *fakeSessionSaver) SaveInterrupted(ctx context.Context, opportunityID, sessionID, company, role, summary string, interrupted InterruptedAt) error {
+	f.saved = true
+	f.lastSessionID = sessionID
+	f.lastInterrupted = interrupted
+	return nil
+}
+
+// fakeBlockingLLM blocks until the context is cancelled, simulating a
+// long-running LLM call that the user interrupts with Stop.
+type fakeBlockingLLM struct{}
+
+func (f *fakeBlockingLLM) Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeBlockingLLM) Stream(ctx context.Context, systemPrompt string, messages []llm.Message, onToken func(string) error) error {
+	return nil
+}
+
+func (f *fakeBlockingLLM) StreamWithTools(ctx context.Context, systemPrompt string, messages []llm.Message, tools []llm.ToolDefinition, onEvent func(llm.StreamEvent) error) error {
+	// Block until context is cancelled (simulates Stop button).
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestChatAgentServiceCancelSavesInterrupted(t *testing.T) {
+	t.Parallel()
+	llm_ := &fakeBlockingLLM{}
+	saver := &fakeSessionSaver{}
+	agent := NewChatAgentService(llm_, &fakeBuilder{}, nil)
+	agent.SetSessionSaver(saver)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Run in a goroutine and cancel after a short delay.
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- agent.Run(ctx, "opp-1", []llm.Message{
+			{Role: "user", Content: "Write me a cover letter"},
+		}, func(ev AgentEvent) error { return nil })
+	}()
+	cancel()
+
+	err := <-errCh
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+
+	if !saver.saved {
+		t.Error("expected SaveInterrupted to be called on cancel")
+	}
+	if saver.lastInterrupted.LastUserMessage != "Write me a cover letter" {
+		t.Errorf("expected last user message 'Write me a cover letter', got %q", saver.lastInterrupted.LastUserMessage)
+	}
+}
+
+func TestChatAgentServiceCancelWithSessionID(t *testing.T) {
+	t.Parallel()
+	// Simulate: agent calls save_session tool, gets a session ID back,
+	// then user clicks Stop. The deferred save should use the existing
+	// session ID (update, not create).
+	llm_ := &fakeAgentLLM{
+		toolCalls:   []llm.ToolCall{{ID: "c1", Name: "save_session", Arguments: `{"summary":"test","company":"Acme","role":"Engineer"}`}},
+		finalTokens: []string{"working"},
+	}
+	registry := &fakeRegistry{result: `{"sessionId":"session-123","message":"Session saved to orkai"}`}
+	saver := &fakeSessionSaver{}
+	agent := NewChatAgentService(llm_, &fakeBuilder{}, registry)
+	agent.SetSessionSaver(saver)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- agent.Run(ctx, "opp-1", []llm.Message{
+			{Role: "user", Content: "Save this session"},
+		}, func(ev AgentEvent) error {
+			// Cancel after the tool result is processed (second LLM call).
+			if ev.Type == AgentEventToolResult {
+				cancel()
+			}
+			return nil
+		})
+	}()
+
+	<-errCh
+	// The deferred save should have the session ID from the save_session tool.
+	if saver.lastSessionID != "session-123" {
+		t.Errorf("expected session ID 'session-123' from save_session tool, got %q", saver.lastSessionID)
+	}
+}
