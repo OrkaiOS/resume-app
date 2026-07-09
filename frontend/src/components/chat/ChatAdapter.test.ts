@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { processChatEvent, type ChatAdapterState } from "./ChatAdapter"
+import { processChatEvent, toChatMessages, type ChatAdapterState } from "./ChatAdapter"
 
 function freshState(): ChatAdapterState {
   return { fullText: "", fullReasoning: "", toolCallParts: [] }
@@ -141,5 +141,70 @@ describe("processChatEvent", () => {
     expect(content![0].type).toBe("reasoning")
     expect(content![1].type).toBe("text")
     expect(content![2].type).toBe("tool-call")
+  })
+})
+
+describe("toChatMessages", () => {
+  it("extracts text from text parts and joins with newline", () => {
+    const out = toChatMessages([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Hello" },
+          { type: "text", text: "World" },
+        ],
+      },
+    ])
+    expect(out).toEqual([{ role: "user", content: "Hello\nWorld" }])
+  })
+
+  it("drops reasoning-only parts — display-only, never sent to model", () => {
+    const out = toChatMessages([
+      {
+        role: "assistant",
+        content: [{ type: "reasoning", text: "Let me think about this" }],
+      },
+    ])
+    expect(out).toEqual([])
+  })
+
+  it("drops an interrupted assistant turn that produced only reasoning (no text)", () => {
+    const out = toChatMessages([
+      { role: "user", content: [{ type: "text", text: "What about this opportunity?" }] },
+      {
+        role: "assistant",
+        content: [{ type: "reasoning", text: "I should look up..." }],
+      },
+      { role: "user", content: [{ type: "text", text: "Sorry, a quick detail please." }] },
+    ])
+    expect(out).toEqual([
+      { role: "user", content: "What about this opportunity?" },
+      { role: "user", content: "Sorry, a quick detail please." },
+    ])
+  })
+
+  it("keeps an assistant turn that produced text alongside reasoning", () => {
+    const out = toChatMessages([
+      {
+        role: "assistant",
+        content: [
+          { type: "reasoning", text: "thinking" },
+          { type: "text", text: "answer" },
+        ],
+      },
+    ])
+    expect(out).toEqual([{ role: "assistant", content: "answer" }])
+  })
+
+  it("drops tool-call-only assistant turns (no text produced)", () => {
+    const out = toChatMessages([
+      {
+        role: "assistant",
+        content: [
+          { type: "tool-call", toolCallId: "c1", toolName: "shell", argsText: "{}" },
+        ],
+      },
+    ])
+    expect(out).toEqual([])
   })
 })
