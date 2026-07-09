@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { FileText, Mail, MessageSquare, Trash2, Loader2 } from "lucide-react"
+import { FileText, Mail, MessageSquare, Trash2, Pencil, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -21,13 +21,14 @@ import type { OpportunityResponse } from "@/types/api"
 
 interface OpportunityCardProps {
   opportunity: OpportunityResponse
+  onEdit?: (opportunity: OpportunityResponse) => void
 }
 
 // @orkai:ref(id=2cf97580-172f-410d-81b4-edb7e177a7b3)
 // @orkai:ref(id=6e959cda-9e4a-4c44-b87e-4c43deea936f)
 // @orkai:ref(id=50cd15ac-f372-48ac-baa6-fdc20566c343)
 // @orkai:decision URL-based routing via ?chat= query param — no React Router needed for simple SPA navigation between Home and Chat pages.
-function OpportunityCard({ opportunity }: OpportunityCardProps) {
+function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const deleteOpportunity = useDeleteOpportunity()
   const resume = useResumeByOpportunity(opportunity.id)
@@ -58,19 +59,33 @@ function OpportunityCard({ opportunity }: OpportunityCardProps) {
             <CardTitle className="text-base">{opportunity.company}</CardTitle>
             <CardDescription className="mt-1">{opportunity.role}</CardDescription>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-            onClick={() => setConfirmingDelete(true)}
-            aria-label={S.home.deleteOpportunity}
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {onEdit && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground hover:text-foreground"
+                onClick={() => onEdit(opportunity)}
+                aria-label={S.home.editOpportunity}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirmingDelete(true)}
+              aria-label={S.home.deleteOpportunity}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="flex-1 space-y-2">
         {opportunity.description && (
           <p className="whitespace-pre-wrap text-sm text-muted-foreground line-clamp-4">
             {opportunity.description}
