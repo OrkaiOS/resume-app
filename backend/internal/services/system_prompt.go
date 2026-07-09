@@ -11,12 +11,13 @@ import (
 )
 
 // @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
-// @orkai:decision SystemPromptService assembles the agent system prompt at session start from orkai standards + local profile data. Every claim must be traceable to the profile, the job description, or the writing principles. The service gracefully degrades when orkai is unreachable — profile-only prompt still works.
+// @orkai:decision SystemPromptService assembles the agent system prompt at session start from orkai standards + local profile data. Every claim must be traceable to the profile, the job description, the User Insights, or the writing principles. The service gracefully degrades when orkai is unreachable — profile-only prompt still works.
 type SystemPromptService struct {
 	onboardingStore  store.OnboardingStore
 	profileStore     store.ProfileStore
 	opportunityStore store.OpportunityStore
 	orkaiClient      *orkai.OrkaiClient
+	sessionSvc       *SessionService
 }
 
 func NewSystemPromptService(
@@ -24,12 +25,14 @@ func NewSystemPromptService(
 	profileStore store.ProfileStore,
 	opportunityStore store.OpportunityStore,
 	orkaiClient *orkai.OrkaiClient,
+	sessionSvc *SessionService,
 ) *SystemPromptService {
 	return &SystemPromptService{
 		onboardingStore:  onboardingStore,
 		profileStore:     profileStore,
 		opportunityStore: opportunityStore,
 		orkaiClient:      orkaiClient,
+		sessionSvc:       sessionSvc,
 	}
 }
 
@@ -37,8 +40,8 @@ const mandatorySourceRule = `
 ## CRITICAL RULES
 
 1. You must use the provided sources. Do not assume or fabricate information.
-   Every claim must be traceable to the profile, the job description, or the
-   writing principles.
+   Every claim must be traceable to the profile, the job description, the
+   User Insights, or the writing principles.
 2. The canonical profile is the single source of truth. When any user-uploaded
    file or older document disagrees with the profile, the profile wins.
 3. When the system prompt alone is insufficient, retrieve additional context
@@ -189,6 +192,16 @@ func (s *SystemPromptService) appendOrkaiSources(b *strings.Builder, ctx context
 			b.WriteString("\n\n## PDF GENERATION SKILL (from orkai)\n\n")
 			b.WriteString(entity.Text)
 			b.WriteString(fmt.Sprintf("\n(orkai ID: %s)\n", state.PDFGenerationSkillID))
+		}
+	}
+
+	// Load User Insights standard if it exists (FR-031, FR-032).
+	if s.sessionSvc != nil {
+		insightsText, err := s.sessionSvc.GetUserInsightsText(ctx)
+		if err == nil && insightsText != "" {
+			b.WriteString("\n\n## USER INSIGHTS (from orkai)\n\n")
+			b.WriteString(insightsText)
+			b.WriteString("\n")
 		}
 	}
 }

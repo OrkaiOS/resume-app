@@ -319,6 +319,133 @@ func (c *OrkaiClient) SearchDocuments(ctx context.Context, query, categoryID str
 	return string(result), nil
 }
 
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision Overview calls the orkai MCP overview tool scoped to a category. Returns a summary of recent sessions, available standards, and skills — the agent's discovery mechanism at session start (FR-034).
+func (c *OrkaiClient) Overview(ctx context.Context, categoryID, projectName string) (string, error) {
+	if err := c.connect(); err != nil {
+		return "", err
+	}
+
+	args := map[string]interface{}{}
+	if categoryID != "" {
+		args["category_id"] = categoryID
+	}
+	if projectName != "" {
+		args["project_name"] = projectName
+	}
+
+	result, err := c.callTool(ctx, "overview", args)
+	if err != nil {
+		return "", fmt.Errorf("orkai.Overview: %w", err)
+	}
+
+	var raw string
+	if err := json.Unmarshal(result, &raw); err == nil {
+		return raw, nil
+	}
+	return string(result), nil
+}
+
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision CreateSession creates an orkai session entity in the personal category with opportunity metadata. Returns the new session ID for subsequent update_session calls (FR-039).
+func (c *OrkaiClient) CreateSession(ctx context.Context, name, text, categoryID string, metadata map[string]string) (string, error) {
+	if err := c.connect(); err != nil {
+		return "", err
+	}
+
+	args := map[string]interface{}{
+		"action":       "create",
+		"name":         name,
+		"text":         text,
+		"category_ids": []string{categoryID},
+	}
+	if metadata != nil {
+		args["metadata"] = metadata
+	}
+
+	result, err := c.callTool(ctx, "session", args)
+	if err != nil {
+		return "", fmt.Errorf("orkai.CreateSession: %w", err)
+	}
+
+	var r createResponse
+	if err := json.Unmarshal(result, &r); err != nil {
+		return "", fmt.Errorf("orkai.CreateSession: parse response: %w", err)
+	}
+	if r.ID == "" {
+		return "", fmt.Errorf("orkai.CreateSession: response missing id")
+	}
+	return r.ID, nil
+}
+
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision UpdateSession updates an existing orkai session entity by ID. Used by the agent at subsequent checkpoints in the same conversation arc (FR-039).
+func (c *OrkaiClient) UpdateSession(ctx context.Context, id, text string) error {
+	if err := c.connect(); err != nil {
+		return err
+	}
+
+	_, err := c.callTool(ctx, "session", map[string]interface{}{
+		"action": "update",
+		"id":     id,
+		"text":   text,
+	})
+	if err != nil {
+		return fmt.Errorf("orkai.UpdateSession: %w", err)
+	}
+	return nil
+}
+
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision SearchStandards searches the orkai workspace for standards by semantic query. Used by save_user_insight to find the existing User Insights standard by name before updating it.
+func (c *OrkaiClient) SearchStandards(ctx context.Context, categoryID, query string) ([]EntityResponse, error) {
+	if err := c.connect(); err != nil {
+		return nil, err
+	}
+
+	result, err := c.callTool(ctx, "standards", map[string]interface{}{
+		"action":       "search",
+		"query":        query,
+		"category_ids": []string{categoryID},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("orkai.SearchStandards: %w", err)
+	}
+
+	// The standards search returns a JSON array of entity objects.
+	var items []EntityResponse
+	if err := json.Unmarshal(result, &items); err != nil {
+		// Try unwrapping a string first (some MCP responses wrap in a string).
+		var raw string
+		if err2 := json.Unmarshal(result, &raw); err2 == nil {
+			if err3 := json.Unmarshal([]byte(raw), &items); err3 != nil {
+				return nil, fmt.Errorf("orkai.SearchStandards: parse response: %w", err3)
+			}
+		} else {
+			return nil, fmt.Errorf("orkai.SearchStandards: parse response: %w", err)
+		}
+	}
+	return items, nil
+}
+
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision UpdateStandard updates an existing orkai standard entity by ID. Used by save_user_insight to append new insights to the existing User Insights standard (FR-032).
+func (c *OrkaiClient) UpdateStandard(ctx context.Context, id, text string) error {
+	if err := c.connect(); err != nil {
+		return err
+	}
+
+	_, err := c.callTool(ctx, "standards", map[string]interface{}{
+		"action": "update",
+		"id":     id,
+		"text":   text,
+	})
+	if err != nil {
+		return fmt.Errorf("orkai.UpdateStandard: %w", err)
+	}
+	return nil
+}
+
 func (c *OrkaiClient) LinkEntities(ctx context.Context, sourceID, targetID string) error {
 	if err := c.connect(); err != nil {
 		return err

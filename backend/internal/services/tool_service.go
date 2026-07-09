@@ -124,27 +124,29 @@ func (s *OrkaiSearchService) Search(ctx context.Context, query string) (string, 
 }
 
 // ToolRegistry implements llm.ToolRegistry by wiring the shell, orkai
-// search, profile, and artifact tools. Each Execute returns a JSON
-// string the LLM sees as the tool result.
+// search, profile, artifact, session, and user-insight tools. Each
+// Execute returns a JSON string the LLM sees as the tool result.
 // @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
-// @orkai:decision One registry owns all agent tools (shell, orkai_search, profile, artifacts). Per-call temp dirs for shell (per-session workspace is FR-034 scope). Errors from tools are returned as JSON {error:...} so the agent can react, not as Go errors that would abort the chat.
+// @orkai:decision One registry owns all agent tools (shell, orkai_search, orkai_get, profile, artifacts, overview, save_session, update_session, save_user_insight). Per-call temp dirs for shell (per-session workspace is FR-034 scope). Errors from tools are returned as JSON {error:...} so the agent can react, not as Go errors that would abort the chat.
 type ToolRegistry struct {
 	shell     *ShellService
 	search    *OrkaiSearchService
 	orkai     *orkai.OrkaiClient
 	profile   *ProfileService
 	artifacts *ArtifactService
+	session   *SessionService
 	defs      []llm.ToolDefinition
 }
 
-// NewToolRegistry builds a ToolRegistry wiring all four tool services.
-func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboardingStore store.OnboardingStore, profile *ProfileService, artifacts *ArtifactService) *ToolRegistry {
+// NewToolRegistry builds a ToolRegistry wiring all tool services.
+func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboardingStore store.OnboardingStore, profile *ProfileService, artifacts *ArtifactService, session *SessionService) *ToolRegistry {
 	return &ToolRegistry{
 		shell:     shell,
 		search:    NewOrkaiSearchService(orkaiClient, onboardingStore),
 		orkai:     orkaiClient,
 		profile:   profile,
 		artifacts: artifacts,
+		session:   session,
 		defs: []llm.ToolDefinition{
 			{
 				Name:        "shell",
@@ -215,6 +217,48 @@ func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboar
   "required": ["id"]
 }`),
 			},
+			{
+				Name:        "overview",
+				Description: "Get a summary of the orkai workspace: recent session summaries, available standards, and available skills. Use this at the start of every chat session to discover what sessions exist for this opportunity and what standards/skills you can draw on. This is your discovery mechanism — call it before searching blindly.",
+				Parameters:  json.RawMessage(`{"type":"object","properties":{}}`),
+			},
+			{
+				Name:        "save_session",
+				Description: "Save a distilled summary of the current conversation to orkai. Use this at meaningful checkpoints: after resolving a user concern, after producing a draft, after a revision, or after the user shares durable context. The summary should capture what was discussed, decided, and produced — NOT a raw transcript. You will receive a session ID back; use it with update_session for subsequent saves in the same conversation arc.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "summary": {"type": "string", "description": "Distilled summary of the conversation — what was discussed, decided, and produced. NOT a raw transcript."},
+    "opportunityId": {"type": "string", "description": "The opportunity ID this session belongs to"},
+    "company": {"type": "string", "description": "Company name for the session name"},
+    "role": {"type": "string", "description": "Role title for the session name"}
+  },
+  "required": ["summary"]
+}`),
+			},
+			{
+				Name:        "update_session",
+				Description: "Update an existing orkai session with new summary text. Use this at subsequent checkpoints in the same conversation arc (after the first save_session). You must provide the session ID returned by a prior save_session call.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "sessionId": {"type": "string", "description": "The session ID returned by a prior save_session call"},
+    "summary": {"type": "string", "description": "Updated distilled summary of the conversation"}
+  },
+  "required": ["sessionId", "summary"]
+}`),
+			},
+			{
+				Name:        "save_user_insight",
+				Description: "Save a durable user-specific insight that should influence all future resume and cover letter generation. Use this when the user shares something with lasting relevance: tone/style preferences, career narrative, constraints (e.g. age-bias mitigation framing), accessibility needs, naming preferences. The insight is stored in a single 'User Insights' standard that is loaded into the system prompt for every future session — the user never has to repeat it.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "insight": {"type": "string", "description": "The durable user insight to preserve for future sessions. Write it as a clear, actionable guideline the agent can follow."}
+  },
+  "required": ["insight"]
+}`),
+			},
 		},
 	}
 }
@@ -244,6 +288,14 @@ func (r *ToolRegistry) Execute(ctx context.Context, call llm.ToolCall) (string, 
 		return r.execSaveArtifact(ctx, call.Arguments)
 	case "get_artifact":
 		return r.execGetArtifact(ctx, call.Arguments)
+	case "overview":
+		return r.execOverview(ctx)
+	case "save_session":
+		return r.execSaveSession(ctx, call.Arguments)
+	case "update_session":
+		return r.execUpdateSession(ctx, call.Arguments)
+	case "save_user_insight":
+		return r.execSaveUserInsight(ctx, call.Arguments)
 	default:
 		return encodeJSON(map[string]string{"error": "unknown tool: " + call.Name})
 	}
@@ -348,6 +400,86 @@ func (r *ToolRegistry) execGetArtifact(ctx context.Context, argsJSON string) (st
 		return encodeJSON(map[string]string{"error": err.Error()})
 	}
 	return encodeJSON(item)
+}
+
+func (r *ToolRegistry) execOverview(ctx context.Context) (string, error) {
+	if r.search == nil || r.orkai == nil {
+		return encodeJSON(map[string]string{"error": "orkai client not configured"})
+	}
+	state, err := r.search.onboardingStore.Get(ctx)
+	if err != nil {
+		return encodeJSON(map[string]string{"error": err.Error()})
+	}
+	if state.OrkaiCategoryID == "" {
+		return encodeJSON(map[string]string{"error": "orkai category not configured"})
+	}
+	overview, err := r.orkai.Overview(ctx, state.OrkaiCategoryID, "resume-app")
+	if err != nil {
+		return encodeJSON(map[string]string{"error": err.Error()})
+	}
+	return encodeJSON(map[string]string{"overview": overview})
+}
+
+func (r *ToolRegistry) execSaveSession(ctx context.Context, argsJSON string) (string, error) {
+	if r.session == nil {
+		return encodeJSON(map[string]string{"error": "session service not configured"})
+	}
+	var args struct {
+		Summary       string `json:"summary"`
+		OpportunityID string `json:"opportunityId"`
+		Company       string `json:"company"`
+		Role          string `json:"role"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execSaveSession: parse args: %w", err)
+	}
+	if args.Summary == "" {
+		return encodeJSON(map[string]string{"error": "summary is required"})
+	}
+	sessionID, err := r.session.Save(ctx, args.OpportunityID, args.Company, args.Role, args.Summary)
+	if err != nil {
+		return encodeJSON(map[string]string{"error": err.Error()})
+	}
+	return encodeJSON(map[string]string{"sessionId": sessionID, "message": "Session saved to orkai"})
+}
+
+func (r *ToolRegistry) execUpdateSession(ctx context.Context, argsJSON string) (string, error) {
+	if r.session == nil {
+		return encodeJSON(map[string]string{"error": "session service not configured"})
+	}
+	var args struct {
+		SessionID string `json:"sessionId"`
+		Summary   string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execUpdateSession: parse args: %w", err)
+	}
+	if args.SessionID == "" || args.Summary == "" {
+		return encodeJSON(map[string]string{"error": "sessionId and summary are required"})
+	}
+	if err := r.session.Update(ctx, args.SessionID, args.Summary); err != nil {
+		return encodeJSON(map[string]string{"error": err.Error()})
+	}
+	return encodeJSON(map[string]string{"message": "Session updated in orkai"})
+}
+
+func (r *ToolRegistry) execSaveUserInsight(ctx context.Context, argsJSON string) (string, error) {
+	if r.session == nil {
+		return encodeJSON(map[string]string{"error": "session service not configured"})
+	}
+	var args struct {
+		Insight string `json:"insight"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execSaveUserInsight: parse args: %w", err)
+	}
+	if args.Insight == "" {
+		return encodeJSON(map[string]string{"error": "insight is required"})
+	}
+	if err := r.session.SaveUserInsight(ctx, args.Insight); err != nil {
+		return encodeJSON(map[string]string{"error": err.Error()})
+	}
+	return encodeJSON(map[string]string{"message": "Saved as a user insight for future sessions"})
 }
 
 func encodeJSON(v any) (string, error) {
