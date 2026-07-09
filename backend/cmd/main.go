@@ -162,6 +162,7 @@ func Run() error {
 
 	llmClient := createLLMClient(cfg, onboardingStore)
 	chatAgent := services.NewChatAgentService(llmClient, systemPromptSvc, toolRegistry)
+	chatAgent.SetSessionSaver(sessionSvc)
 	chatHandler := handlers.NewChatHandler(chatAgent)
 	v1.POST("/chat", chatHandler.Stream)
 

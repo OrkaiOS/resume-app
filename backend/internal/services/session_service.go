@@ -12,6 +12,16 @@ import (
 
 const userInsightsStandardName = "User Insights — Resume & Cover Letter"
 
+// InterruptedAt records the state of a conversation when the user clicks Stop.
+// It is serialized into the session summary so the agent can resume context
+// in a future session via overview (FR-030, FR-034).
+type InterruptedAt struct {
+	LastUserMessage   string `json:"lastUserMessage"`
+	LastAssistantText string `json:"lastAssistantText"`
+	Iteration         int    `json:"iteration"`
+	Phase             string `json:"phase"` // "llm-call" or "tool-exec"
+}
+
 // @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
 // @orkai:decision SessionService wraps the orkai client for session and user-insight persistence. It is the single place where session names, metadata shapes, and the User Insights standard name are defined. The agent tools (save_session, update_session, save_user_insight) delegate to this service.
 type SessionService struct {
@@ -88,6 +98,31 @@ func (s *SessionService) SaveUserInsight(ctx context.Context, insight string) er
 		return fmt.Errorf("services.SessionService.SaveUserInsight: create standard: %w", err)
 	}
 	return nil
+}
+
+// SaveInterrupted saves or updates a session with an interrupted_at marker.
+// If sessionID is empty, a new session is created. If set, the existing
+// session is updated. The interrupted_at marker records the last user
+// message, last assistant text, iteration count, and whether the stop
+// happened mid-LLM-call or mid-tool-execution.
+func (s *SessionService) SaveInterrupted(ctx context.Context, opportunityID, sessionID, company, role, summary string, interrupted InterruptedAt) error {
+	marker := fmt.Sprintf("\n\n---\n## Interrupted at\n\n- **Last user message**: %s\n- **Last assistant text**: %s\n- **Iteration**: %d\n- **Phase**: %s\n",
+		interrupted.LastUserMessage, interrupted.LastAssistantText, interrupted.Iteration, interrupted.Phase)
+
+	if sessionID != "" {
+		// Update existing session — append the interrupted marker.
+		// We need the current text to append to it. Since we don't have
+		// a GetSession method, we update with just the marker appended
+		// to the summary. The orkai session tool's update replaces text,
+		// so we include the summary + marker.
+		text := summary + marker
+		return s.client.UpdateSession(ctx, sessionID, text)
+	}
+
+	// No existing session — create a new one with the interrupted marker.
+	text := summary + marker
+	_, err := s.Save(ctx, opportunityID, company, role, text)
+	return err
 }
 
 // GetUserInsightsText searches for the User Insights standard and returns
