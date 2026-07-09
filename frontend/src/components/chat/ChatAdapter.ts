@@ -16,9 +16,31 @@ function getApiBase(): string {
 
 const API_BASE = getApiBase()
 
-interface ChatMessage {
+export interface ChatMessage {
   role: string
   content: string
+}
+
+export type ChatMessagePart =
+  | { type: "text"; text: string }
+  | { type: "reasoning"; text: string }
+  | { type: "tool-call"; toolCallId: string; toolName: string; argsText: string; result?: string }
+
+export type ChatModelMessage = {
+  role: string
+  content: readonly ChatMessagePart[]
+}
+
+export function toChatMessages(messages: readonly ChatModelMessage[]): ChatMessage[] {
+  return messages
+    .map((m) => ({
+      role: m.role,
+      content: m.content
+        .filter((c): c is { type: "text"; text: string } => c.type === "text")
+        .map((c) => c.text)
+        .join("\n"),
+    }))
+    .filter((m) => m.content !== "")
 }
 
 export interface ToolCallPart {
@@ -107,13 +129,9 @@ export function processChatEvent(state: ChatAdapterState, event: ChatStreamEvent
 export function createChatAdapter(opportunityId: string | null): ChatModelAdapter {
   return {
     run: async function* ({ messages, abortSignal }) {
-      const chatMessages: ChatMessage[] = messages.map((m) => ({
-        role: m.role,
-        content: m.content
-          .filter((c): c is { type: "text"; text: string } => c.type === "text")
-          .map((c) => c.text)
-          .join("\n"),
-      }))
+      const chatMessages: ChatMessage[] = toChatMessages(
+        messages as readonly ChatModelMessage[],
+      )
 
       const body: Record<string, unknown> = { messages: chatMessages }
       if (opportunityId) {
