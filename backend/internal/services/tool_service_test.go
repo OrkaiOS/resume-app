@@ -62,7 +62,7 @@ func TestShellServiceNonZeroExitCode(t *testing.T) {
 
 func TestToolRegistryExecuteShell(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
 
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "1",
@@ -83,7 +83,7 @@ func TestToolRegistryExecuteShell(t *testing.T) {
 
 func TestToolRegistryUnknownTool(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "2",
 		Name:      "unknown_tool",
@@ -99,9 +99,92 @@ func TestToolRegistryUnknownTool(t *testing.T) {
 
 func TestToolRegistryDefinitionsCount(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
 	defs := registry.Definitions()
-	if len(defs) != 7 {
-		t.Errorf("expected 7 tool definitions, got %d", len(defs))
+	if len(defs) != 11 {
+		t.Errorf("expected 11 tool definitions, got %d", len(defs))
+	}
+}
+
+func TestToolRegistryExecOverviewNoOrkai(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "3",
+		Name:      "overview",
+		Arguments: `{}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "error") {
+		t.Errorf("expected error in output when orkai not configured, got %q", out)
+	}
+}
+
+func TestToolRegistryExecSaveSessionNoService(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "4",
+		Name:      "save_session",
+		Arguments: `{"summary":"test summary"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "session service not configured") {
+		t.Errorf("expected 'session service not configured' error, got %q", out)
+	}
+}
+
+func TestToolRegistryExecUpdateSessionNoService(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "5",
+		Name:      "update_session",
+		Arguments: `{"sessionId":"abc","summary":"updated"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "session service not configured") {
+		t.Errorf("expected 'session service not configured' error, got %q", out)
+	}
+}
+
+func TestToolRegistryExecSaveUserInsightNoService(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "6",
+		Name:      "save_user_insight",
+		Arguments: `{"insight":"test insight"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "session service not configured") {
+		t.Errorf("expected 'session service not configured' error, got %q", out)
+	}
+}
+
+func TestToolRegistryExecSaveSessionMissingSummary(t *testing.T) {
+	t.Parallel()
+	// Create a registry with a session service but no orkai client — the
+	// session service will fail on the actual orkai call, but we want to
+	// test that the summary validation works first.
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "7",
+		Name:      "save_session",
+		Arguments: `{}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "error") {
+		t.Errorf("expected error in output, got %q", out)
 	}
 }

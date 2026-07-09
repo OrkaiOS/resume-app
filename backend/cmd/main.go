@@ -140,8 +140,9 @@ func Run() error {
 	orkaiClient := orkai.NewOrkaiClient(cfg.OrkaiMCPURL, cfg.OrkaiMCPToken)
 	shellSvc := services.NewShellService()
 	orkaiSearchSvc := services.NewOrkaiSearchService(orkaiClient, onboardingStore)
+	sessionSvc := services.NewSessionService(orkaiClient, onboardingStore)
 	toolsSvc := services.NewToolsService(shellSvc, orkaiSearchSvc, profileSvc)
-	toolRegistry := services.NewToolRegistry(shellSvc, orkaiClient, onboardingStore, profileSvc, artifactSvc)
+	toolRegistry := services.NewToolRegistry(shellSvc, orkaiClient, onboardingStore, profileSvc, artifactSvc, sessionSvc)
 	toolsHandler := handlers.NewToolsHandler(toolsSvc)
 	v1.POST("/tools/shell", toolsHandler.Shell)
 	v1.POST("/tools/orkai-search", toolsHandler.OrkaiSearch)
@@ -157,7 +158,7 @@ func Run() error {
 	v1.POST("/onboarding/orkai-setup", orkaiSetupHandler.StartSetup)
 	v1.GET("/onboarding/orkai-setup/status", orkaiSetupHandler.GetStatus)
 
-	systemPromptSvc := services.NewSystemPromptService(onboardingStore, profileStore, opportunityStore, orkaiClient)
+	systemPromptSvc := services.NewSystemPromptService(onboardingStore, profileStore, opportunityStore, orkaiClient, sessionSvc)
 
 	llmClient := createLLMClient(cfg, onboardingStore)
 	chatAgent := services.NewChatAgentService(llmClient, systemPromptSvc, toolRegistry)
