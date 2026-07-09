@@ -36,6 +36,9 @@
     "deleteOpportunity": "Delete opportunity",
     "confirmDelete": "Delete?",
     "deleteConfirm": "Delete",
+    "editOpportunity": "Edit opportunity",
+    "editSubmit": "Save",
+    "editHeader": "Edit opportunity",
     "resumeLabel": "Resume",
     "coverLetterLabel": "Cover Letter"
   }

@@ -8,15 +8,17 @@ import { useOpportunities } from "@/api/opportunities"
 import { OpportunityCard } from "@/features/home/OpportunityCard"
 import { EmptyState } from "@/features/home/EmptyState"
 import { CreateOpportunityForm } from "@/features/home/CreateOpportunityForm"
+import type { OpportunityResponse } from "@/types/api"
 
 // @orkai:ref(id=2cf97580-172f-410d-81b4-edb7e177a7b3)
 // @orkai:ref(id=96a4fb45-c107-4855-8f1a-cb701c958dac)
 // @orkai:ref(id=6e959cda-9e4a-4c44-b87e-4c43deea936f)
 // @orkai:ref(id=5759c69e-7fc5-4e0c-8e9e-554fd4388492)
-// @orkai:decision Loading/error/empty/populated states per NFR-14; responsive grid 1 col mobile, 2 col md, 3 col lg per NFR-13 (1024-2560px)
+// @orkai:decision Loading/error/empty/populated states per NFR-14; responsive grid 1 col mobile, 2 col md, 3 col lg per NFR-13 (1024-2560px). A single form instance serves create and edit: `editingOpportunity` is null → create mode, set → edit mode with that opportunity's values prefilled.
 function HomePage() {
   const { data, isLoading, isError, refetch } = useOpportunities()
   const [showCreate, setShowCreate] = useState(false)
+  const [editingOpportunity, setEditingOpportunity] = useState<OpportunityResponse | null>(null)
 
   if (isLoading) {
     return (
@@ -54,6 +56,7 @@ function HomePage() {
   }
 
   const items = data?.items ?? []
+  const showForm = showCreate || editingOpportunity !== null
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,7 +70,10 @@ function HomePage() {
           </div>
           <Button
             type="button"
-            onClick={() => setShowCreate((v) => !v)}
+            onClick={() => {
+              setEditingOpportunity(null)
+              setShowCreate((v) => !v)
+            }}
             className="gap-2"
           >
             <Plus className="size-4" />
@@ -77,18 +83,26 @@ function HomePage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        {showCreate && (
+        {showForm && (
           <Card className="mb-6">
             <CardContent className="pt-4">
               <CreateOpportunityForm
-                onCancel={() => setShowCreate(false)}
-                onCreated={() => setShowCreate(false)}
+                key={editingOpportunity?.id ?? "new"}
+                opportunity={editingOpportunity ?? undefined}
+                onCancel={() => {
+                  setShowCreate(false)
+                  setEditingOpportunity(null)
+                }}
+                onSaved={() => {
+                  setShowCreate(false)
+                  setEditingOpportunity(null)
+                }}
               />
             </CardContent>
           </Card>
         )}
 
-        {items.length === 0 && !showCreate ? (
+        {items.length === 0 && !showForm ? (
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -96,6 +110,7 @@ function HomePage() {
               <OpportunityCard
                 key={opportunity.id}
                 opportunity={opportunity}
+                onEdit={setEditingOpportunity}
               />
             ))}
           </div>

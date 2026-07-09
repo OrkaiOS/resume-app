@@ -14,46 +14,68 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { S } from "@/lib/strings"
-import { useCreateOpportunity } from "@/api/opportunities"
+import { useCreateOpportunity, useUpdateOpportunity } from "@/api/opportunities"
 import {
   createOpportunitySchema,
   type CreateOpportunityFormValues,
 } from "@/features/home/create-opportunity-schema"
+import type { OpportunityResponse } from "@/types/api"
 
 interface CreateOpportunityFormProps {
   onCancel: () => void
-  onCreated: () => void
+  onSaved: () => void
+  opportunity?: OpportunityResponse
 }
 
 // @orkai:ref(id=2cf97580-172f-410d-81b4-edb7e177a7b3)
 // @orkai:ref(id=359cbba1-0559-4db9-af44-3533e0ab918c)
 // @orkai:ref(id=5759c69e-7fc5-4e0c-8e9e-554fd4388492)
-// @orkai:decision Inline Card-based form (no separate route) — App.tsx switches on gate not URL, so the create flow lives inside the Home page surface
-function CreateOpportunityForm({ onCancel, onCreated }: CreateOpportunityFormProps) {
+// @orkai:decision Inline Card-based form (no separate route) — App.tsx switches on gate not URL, so the create/edit flow lives inside the Home page surface. One form serves both modes via an optional `opportunity` prop: undefined → create, set → update with that opportunity's values as defaults.
+function CreateOpportunityForm({ onCancel, onSaved, opportunity }: CreateOpportunityFormProps) {
+  const isEdit = opportunity !== undefined
   const createOpportunity = useCreateOpportunity()
+  const updateOpportunity = useUpdateOpportunity()
 
   const form = useForm<CreateOpportunityFormValues>({
     resolver: zodResolver(createOpportunitySchema) as unknown as Resolver<CreateOpportunityFormValues>,
     defaultValues: {
-      company: "",
-      role: "",
-      description: "",
+      company: opportunity?.company ?? "",
+      role: opportunity?.role ?? "",
+      description: opportunity?.description ?? "",
     },
   })
 
   function onSubmit(values: CreateOpportunityFormValues) {
+    if (isEdit && opportunity) {
+      updateOpportunity.mutate(
+        { id: opportunity.id, body: { ...values, status: opportunity.status } },
+        {
+          onSuccess: (res) => {
+            if (!res.error) {
+              onSaved()
+            }
+          },
+        },
+      )
+      return
+    }
     createOpportunity.mutate(values, {
       onSuccess: (res) => {
         if (!res.error) {
-          onCreated()
+          onSaved()
         }
       },
     })
   }
 
+  const pending = createOpportunity.isPending || updateOpportunity.isPending
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          {isEdit ? S.home.editHeader : S.home.newOpportunity}
+        </h2>
         <FormField
           control={form.control}
           name="company"
@@ -132,14 +154,14 @@ function CreateOpportunityForm({ onCancel, onCreated }: CreateOpportunityFormPro
           <Button type="button" variant="outline" onClick={onCancel}>
             {S.home.createCancel}
           </Button>
-          <Button type="submit" disabled={createOpportunity.isPending}>
-            {createOpportunity.isPending ? (
+          <Button type="submit" disabled={pending}>
+            {pending ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
-                {S.home.createSubmit}
+                {isEdit ? S.home.editSubmit : S.home.createSubmit}
               </>
             ) : (
-              S.home.createSubmit
+              isEdit ? S.home.editSubmit : S.home.createSubmit
             )}
           </Button>
         </div>
