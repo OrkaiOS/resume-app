@@ -73,9 +73,6 @@ function CreateOpportunityForm({ onCancel, onSaved, opportunity }: CreateOpportu
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          {isEdit ? S.home.editHeader : S.home.newOpportunity}
-        </h2>
         <FormField
           control={form.control}
           name="company"

@@ -2,7 +2,12 @@ import { useState } from "react"
 import { Loader2, Plus, AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { S } from "@/lib/strings"
 import { useOpportunities } from "@/api/opportunities"
 import { OpportunityCard } from "@/features/home/OpportunityCard"
@@ -56,7 +61,12 @@ function HomePage() {
   }
 
   const items = data?.items ?? []
-  const showForm = showCreate || editingOpportunity !== null
+  const dialogOpen = showCreate || editingOpportunity !== null
+
+  function closeDialog() {
+    setShowCreate(false)
+    setEditingOpportunity(null)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -72,7 +82,7 @@ function HomePage() {
             type="button"
             onClick={() => {
               setEditingOpportunity(null)
-              setShowCreate((v) => !v)
+              setShowCreate(true)
             }}
             className="gap-2"
           >
@@ -83,26 +93,23 @@ function HomePage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        {showForm && (
-          <Card className="mb-6">
-            <CardContent className="pt-4">
-              <CreateOpportunityForm
-                key={editingOpportunity?.id ?? "new"}
-                opportunity={editingOpportunity ?? undefined}
-                onCancel={() => {
-                  setShowCreate(false)
-                  setEditingOpportunity(null)
-                }}
-                onSaved={() => {
-                  setShowCreate(false)
-                  setEditingOpportunity(null)
-                }}
-              />
-            </CardContent>
-          </Card>
-        )}
+        <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog() }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {editingOpportunity ? S.home.editOpportunity : S.home.newOpportunity}
+              </DialogTitle>
+            </DialogHeader>
+            <CreateOpportunityForm
+              key={editingOpportunity?.id ?? "new"}
+              opportunity={editingOpportunity ?? undefined}
+              onCancel={closeDialog}
+              onSaved={closeDialog}
+            />
+          </DialogContent>
+        </Dialog>
 
-        {items.length === 0 && !showForm ? (
+        {items.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
