@@ -62,3 +62,16 @@ export async function apiUpload<T>(
   })
   return res.json() as Promise<ApiResponse<T>>
 }
+
+export async function apiHealth(): Promise<boolean> {
+  try {
+    const res = await fetch("/health", {
+      cache: "no-store",
+    })
+    if (!res.ok) return false
+    const body = await res.json()
+    return body?.status === "ok"
+  } catch {
+    return false
+  }
+}

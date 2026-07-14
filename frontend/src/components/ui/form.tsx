@@ -5,12 +5,16 @@ import {
   type FieldPath,
   type FieldValues,
   FormProvider,
-  useFormContext,
   type UseFormReturn,
 } from "react-hook-form"
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
+import {
+  FormFieldContext,
+  FormItemContext,
+  useFormField,
+} from "./use-form-field"
 
 function Form<TFieldValues extends FieldValues>({
   children,
@@ -20,17 +24,6 @@ function Form<TFieldValues extends FieldValues>({
 } & UseFormReturn<TFieldValues>) {
   return <FormProvider {...props}>{children}</FormProvider>
 }
-
-interface FormFieldContextValue<
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
-> {
-  name: TName
-}
-
-const FormFieldContext = React.createContext<FormFieldContextValue | null>(
-  null
-)
 
 function FormField<
   TFieldValues extends FieldValues = FieldValues,
@@ -42,48 +35,6 @@ function FormField<
     </FormFieldContext.Provider>
   )
 }
-
-interface UseFormFieldReturn {
-  id: string
-  name: string
-  formItemId: string
-  formDescriptionId: string
-  formMessageId: string
-  error?: unknown
-}
-
-function useFormField(): UseFormFieldReturn {
-  const fieldContext = React.useContext(FormFieldContext)
-  const itemContext = React.useContext(FormItemContext)
-
-  if (!fieldContext) {
-    throw new Error("useFormField should be used within <FormField>")
-  }
-  if (!itemContext) {
-    throw new Error("useFormField should be used within <FormItem>")
-  }
-
-  const { getFieldState, formState } = useFormContext()
-  const fieldState = getFieldState(fieldContext.name, formState)
-  const { id } = itemContext
-
-  return {
-    id,
-    name: fieldContext.name,
-    formItemId: `${id}-form-item`,
-    formDescriptionId: `${id}-form-item-description`,
-    formMessageId: `${id}-form-item-message`,
-    ...fieldState,
-  }
-}
-
-interface FormItemContextValue {
-  id: string
-}
-
-const FormItemContext = React.createContext<FormItemContextValue | null>(
-  null
-)
 
 interface FormItemProps extends React.ComponentProps<"div"> {}
 
@@ -176,7 +127,6 @@ function FormMessage({ className, children, ...props }: FormMessageProps) {
 }
 
 export {
-  useFormField,
   Form,
   FormProvider,
   FormItem,
