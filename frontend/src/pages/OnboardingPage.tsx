@@ -1,10 +1,12 @@
 import { useState, useCallback } from "react"
-import { Check, ChevronDown, Loader2 } from "lucide-react"
+import { Check, ChevronDown, Loader2, RotateCcw } from "lucide-react"
 
 import { Card, CardTitle, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
 
 import { useOnboardingStatus } from "@/api/onboarding"
+import { useQueryClient } from "@tanstack/react-query"
 import { LLMConfigSection } from "@/features/onboarding/LLMConfigSection"
 import { ProfileSection } from "@/features/onboarding/ProfileSection"
 import { OrkaiSetupSection } from "@/features/onboarding/OrkaiSetupSection"
@@ -19,7 +21,12 @@ const STEPS = [
 
 function OnboardingPage(_props: OnboardingPageProps) {
   const [openStep, setOpenStep] = useState(0)
-  const { data: status, isLoading } = useOnboardingStatus()
+  const { data: status, isLoading, isError } = useOnboardingStatus()
+  const queryClient = useQueryClient()
+
+  function handleRetry() {
+    void queryClient.invalidateQueries({ queryKey: ["onboarding", "status"] })
+  }
 
   const handleStepComplete = useCallback((stepId: number) => {
     if (stepId < STEPS.length - 1) {
@@ -53,6 +60,25 @@ function OnboardingPage(_props: OnboardingPageProps) {
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="size-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading your workspace...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+        <div className="mx-4 w-full max-w-md rounded-xl bg-card p-8 text-center text-card-foreground ring-1 ring-foreground/10">
+          <h2 className="text-xl font-semibold text-foreground">
+            Could not load onboarding
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The server did not respond. Please check that the backend is running and try again.
+          </p>
+          <Button className="mt-5 w-full" onClick={handleRetry}>
+            <RotateCcw className="mr-2 size-4" />
+            Retry
+          </Button>
         </div>
       </div>
     )

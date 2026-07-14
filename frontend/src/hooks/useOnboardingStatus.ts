@@ -3,14 +3,16 @@ import { useOnboardingStatus as useApiOnboardingStatus } from "@/api/onboarding"
 interface UseOnboardingStatusResult {
   isOnboarded: boolean | null
   isLoading: boolean
+  isError: boolean
 }
 
 function useOnboardingStatus(): UseOnboardingStatusResult {
-  const { data, isLoading } = useApiOnboardingStatus()
+  const { data, isLoading, isError } = useApiOnboardingStatus()
 
   return {
-    isOnboarded: isLoading ? null : (data?.onboarded ?? false),
+    isOnboarded: isLoading || isError ? null : (data?.onboarded ?? false),
     isLoading,
+    isError,
   }
 }
 
