@@ -12,6 +12,12 @@ _None — all plans completed._
 
 ## Completed Plans
 
+### UX Improvement — Opportunity form as Dialog modal (`b1a389e9-6d8a-4bb8-9ee2-48c5da9c9c4b`) — done
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Modal form migration | `1e0cefc9-f1e0-4e1a-905d-1948a955134f` | T1: Replace inline form with Dialog modal (`4ed0d193`) ✅ · QA: m1 t1 — browser test (`5ce1a1ec`) ✅ · Bug: No error state when backend is down (`3f70199c`) ✅ |
+
 ### Chat Improvements — Reasoning, Session Memory, Stop/Continue (`38104bf3-34c0-4877-b33b-fa893ea1b222`) — done
 
 | # | Milestone | ID | Tasks |

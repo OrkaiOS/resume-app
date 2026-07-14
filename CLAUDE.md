@@ -4,13 +4,14 @@ orkai gives you persistent memory across sessions. Standards, skills, session
 summaries, and indexed source code are stored and semantically searchable.
 Without it, every session starts from zero. With it, you compound knowledge.
 
-**Call overview() before doing anything else.**
+**Call overview() before doing anything else.** No exceptions.
 
-### Project Identity (MANDATORY scoping)
+### Project Identity (MANDATORY scoping — NEVER SKIP)
 
 This project is scoped in orkai. **Every orkai tool call that accepts a
 category filter MUST be scoped to this project** — otherwise the tool operates
-globally and returns entities from unrelated projects.
+globally and returns entities from unrelated projects. This is the #1 cause of
+cross-project contamination. Be strict.
 
 | Field | Value |
 |-------|-------|
@@ -18,74 +19,80 @@ globally and returns entities from unrelated projects.
 | Category ID | `233276ae31223e19a727667e45c51d19` |
 | Source of truth | `.orkai.yaml` → `project.category_id` |
 
-Use `category_ids: ["233276ae31223e19a727667e45c51d19"]` when creating sessions,
-plans, or any scoped entity so work stays in this project. For `overview()`,
-pass `category_id` and `project_name` from `.orkai.yaml` when the MCP server
-cannot read the workspace (e.g. HTTP/SSE transports).
+**Copy-paste these exact tool calls. Do not paraphrase. Do not omit arguments.**
 
-**Scoping rules — apply on EVERY call:**
+#### MANDATORY onboarding (run these EXACT calls, in order, at session start)
 
-- `overview()` → pass `category_id: "233276ae31223e19a727667e45c51d19"` AND
-  `project_name: "resume-app"`. This scopes recent sessions and counts to this
-  project.
-- `session(action: "latest" | "list" | "search")` → pass
-  `category_ids: ["233276ae31223e19a727667e45c51d19"]`.
-- `session(action: "create")` → pass
-  `category_ids: ["233276ae31223e19a727667e45c51d19"]` so the session is filed
-  under this project.
-- `search_code(query)` → pass
+**Step 1 — overview (ONLY category_id, NEVER project_name):**
+```
+overview(category_id: "233276ae31223e19a727667e45c51d19")
+```
+Pass ONLY `category_id`. Do NOT pass `project_name` — it pollutes results with
+entities from other projects. This is the most common scoping failure.
+
+**Step 2 — latest session + plan list (in parallel, BOTH scoped):**
+```
+session(action: "latest", category_ids: ["233276ae31223e19a727667e45c51d19"])
+plan(action: "list", category_ids: ["233276ae31223e19a727667e45c51d19"])
+```
+Both calls MUST include `category_ids`. Omitting it returns sessions/plans from
+every project — that is the bug you are avoiding.
+
+**Step 3 — check for open work** (skip if user already named a task/workflow):
+Scan the plan list for any plan whose `metadata.status` is not `done`. For each
+open plan, list its milestones (scoped), then tasks (scoped) for non-done
+milestones:
+```
+milestone(action: "list", plan_id: "<id>", category_ids: ["233276ae31223e19a727667e45c51d19"])
+tasks(action: "list", milestone_id: "<id>", category_ids: ["233276ae31223e19a727667e45c51d19"])
+```
+Group pending/in-progress tasks by role workflow (IDs in the Role Workflows
+table below).
+
+**Step 4 — brief the user**: summarize (a) what the latest session did, (b)
+current project status and relevant decisions, (c) open work if any. Then ask:
+*"Which task should we start?"* Do NOT auto-start implementation — Marco picks
+the task; the agent loads the matching role workflow via
+`workflow(action: "get", id: ...)` and follows it.
+
+**If the user triggers a specific workflow directly** (e.g. "Trigger the
+Fullstack"), skip the open-work scan and load that workflow immediately.
+
+If step 3 finds zero open plans/milestones/tasks, skip the grouped list and
+just brief + ask what Marco wants to do.
+
+### Scoping rules — apply on EVERY orkai tool call
+
+Every call below MUST include the category filter shown. If you find yourself
+writing an orkai tool call without a `category_id` / `category_ids` argument,
+STOP and add it. The only exceptions are `overview()` (uses singular
+`category_id`), `user_preferences`, and `agent_preferences` (global singletons).
+
+- `overview()` → `category_id: "233276ae31223e19a727667e45c51d19"` ONLY.
+  NEVER `project_name`.
+- `session(action: "latest" | "list" | "search")` →
+  `category_ids: ["233276ae31223e19a727667e45c51d19"]`
+- `session(action: "create")` →
+  `category_ids: ["233276ae31223e19a727667e45c51d19"]` (so the session is filed
+  under this project, not orphaned globally)
+- `search_code(query)` →
   `category_ids: ["233276ae31223e19a727667e45c51d19"]` (or
   `category: "resume-app"`). Without it, results include code from every
   indexed project.
-- `search_document(query)` → same scoping as search_code.
-- `standards(action: "search" | "list")`, `skills(action: "search" | "list")`,
-  `documents(action: "search" | "list")`, `analytics(action: "search" | "list")`,
-  `entity(action: "list" | "search")`, `plan/milestone/tasks(action: "list" |
-  "search")` → pass `category_ids: ["233276ae31223e19a727667e45c51d19"]` (or
-  `category: "resume-app"`) to restrict results to this project.
-- `standards(action: "create")`, `skills(action: "create")`,
-  `documents(action: "create")`, `analytics(action: "create")`,
-  `plan/milestone/tasks(action: "create")`, `entity(action: "create")` → pass
-  `category_ids: ["233276ae31223e19a727667e45c51d19"]` so the new entity is
-  filed under this project and not orphaned globally.
-- `annotations(action: "list")` → annotations are tied to code entities already
-  scoped by search_code; no separate category filter, but always start from a
-  category-scoped search_code call.
+- `search_document(query)` → same scoping as `search_code`.
+- `standards`, `skills`, `documents`, `analytics`, `entity`,
+  `plan`, `milestone`, `tasks` (any action: `list` | `search` | `create`) →
+  `category_ids: ["233276ae31223e19a727667e45c51d19"]` (or
+  `category: "resume-app"`).
+- `annotations(action: "list")` → tied to code entities already scoped by
+  `search_code`; no separate category filter, but always start from a
+  category-scoped `search_code` call.
+- `user_preferences`, `agent_preferences` → intentionally GLOBAL singletons.
+  Do NOT scope these.
 
 **Never omit the category on a create/search/list call.** Global results mix
 projects and break context; global creates orphan entities outside this
-project. `user_preferences` and `agent_preferences` are singletons and are
-intentionally global — do NOT scope those.
-
-### Session Startup — Do This FIRST
-
-1. **Call overview()** with `category_id: "233276ae31223e19a727667e45c51d19"`
-   and `project_name: "resume-app"` — returns recent sessions (with text
-   previews), all standards/skills names, entity counts, your inlined
-   user_preferences body, your inlined agent_preferences playbook (stored or
-   default bootstrap), and a tool reference. One call gives you full
-   orientation. **Read user/agent preferences from the overview response
-   verbatim** — they're inlined, no separate call needed.
-
-2. **Load the latest session** and **list plans** in parallel:
-   - `session(action: "latest", category_ids: ["233276ae31223e19a727667e45c51d19"])`
-   - `plan(action: "list", category_ids: ["233276ae31223e19a727667e45c51d19"])`
-
-3. **Check for open work** — scan the plan list for any plan whose
-   `metadata.status` is not `done`. For each open plan, list its milestones
-   and tasks. Group pending/in-progress tasks by role workflow (see Role
-   Workflows table below for IDs). **Defer this step if the user already
-   named a specific task or workflow** — skip straight to step 4.
-
-4. **Brief the user**: summarize (a) what the latest session did, (b) current
-   project status, and (c) open work if any. Then ask: *"Which task should we
-   start?"* If there is no open work, ask what Marco wants to do. Do NOT
-   auto-start implementation — Marco picks the task; the agent loads the
-   matching role workflow via `workflow(action: "get", id: ...)` and follows it.
-
-**If the user triggers a specific workflow directly** (e.g. "Trigger the
-Fullstack"), skip the open-work scan and load that workflow immediately. The
-workflow's first steps will determine what to work on.
+project.
 
 ### Reusing Existing Plans and Tasks
 
@@ -154,7 +161,7 @@ full content.
 When the user signals the session is ending:
 1. **Ask the user**: "Would you like me to save this session for future
    reference?"
-2. If yes, create a session entity:
+2. If yes, create a session entity (SCOPED):
    `session(action: "create", name: "Session: <topic> - <date>",
    text: "<what was done, what's pending, key decisions, files modified>",
    category_ids: ["233276ae31223e19a727667e45c51d19"])`
@@ -223,7 +230,7 @@ orkai review                     # LLM code review against stored standards
 
 `orkai review` is a CLI code-review command: it reviews your changes against the
 standards and architecture decisions stored in orkai, protecting source-code
-quality. Run `orkai review --help` or see docs/review.md.
+quality. Run "orkai review --help" or see docs/review.md.
 
 ## Restrictions
 
