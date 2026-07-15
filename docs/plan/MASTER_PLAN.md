@@ -18,6 +18,12 @@ _None — all plans completed._
 |---|-----------|-----|-------|
 | M1 | Dialog layout fixes | `26015b17-17cf-46d8-b18d-a2896c51acde` | T1: Constrain textarea growth and widen dialog (`86995cd0`) ✅ · T2: Add colored accent bar to opportunity cards (`21ec0ef9`) ✅ |
 
+### make dev — configurable ports (`08755da6-4892-4054-9682-5ca86ab0f594`) — done
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Configurable ports for make dev | `a3c35a69-4a49-4b33-b93a-80846674ebcd` | T1: vite.config.ts server.port (`3ab50858`) ✅ · T2: Makefile dev target (`6121b456`) ✅ · T3: frontend .env cleanup (`26a9eaee`) ✅ · T4: backend .env.example CORS docs (`e1b15a08`) ✅ · T5: QA workflow port validation (`0c5abc4a`) Pending |
+
 ### UX Improvement — Opportunity form as Dialog modal (`b1a389e9-6d8a-4bb8-9ee2-48c5da9c9c4b`) — done
 
 | # | Milestone | ID | Tasks |
@@ -59,3 +65,4 @@ _None — all plans completed._
 | FR-032 — Agent Tools (shell, profile, orkai-search) | `9aa21fff-2de0-4100-9182-e368e06ddadb` |
 | Make opportunity description required + paste cleanup | `33b0a100-23a3-4f90-95be-c3d0b9aaa77c` |
 | Design System Review | `247dae98-933f-481f-a3d9-38b4bd2ea6e2` |
+| make dev — configurable ports | `08755da6-4892-4054-9682-5ca86ab0f594` |
