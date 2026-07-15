@@ -22,7 +22,7 @@ _None — all plans completed._
 
 | # | Milestone | ID | Tasks |
 |---|-----------|-----|-------|
-| M1 | Configurable ports for make dev | `a3c35a69-4a49-4b33-b93a-80846674ebcd` | T1: vite.config.ts server.port (`3ab50858`) ✅ · T2: Makefile dev target (`6121b456`) ✅ · T3: frontend .env cleanup (`26a9eaee`) ✅ · T4: backend .env.example CORS docs (`e1b15a08`) ✅ · T5: QA workflow port validation (`0c5abc4a`) Pending |
+| M1 | Configurable ports for make dev | `a3c35a69-4a49-4b33-b93a-80846674ebcd` | T1: vite.config.ts server.port (`3ab50858`) ✅ · T2: Makefile dev target (`6121b456`) ✅ · T3: frontend .env cleanup (`26a9eaee`) ✅ · T4: backend .env.example CORS docs (`e1b15a08`) ✅ · T5: QA workflow port validation (`0c5abc4a`) ✅ |
 
 ### UX Improvement — Opportunity form as Dialog modal (`b1a389e9-6d8a-4bb8-9ee2-48c5da9c9c4b`) — done
 
