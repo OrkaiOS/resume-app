@@ -28,6 +28,8 @@ interface OpportunityCardProps {
 // @orkai:ref(id=6e959cda-9e4a-4c44-b87e-4c43deea936f)
 // @orkai:ref(id=50cd15ac-f372-48ac-baa6-fdc20566c343)
 // @orkai:decision URL-based routing via ?chat= query param — no React Router needed for simple SPA navigation between Home and Chat pages.
+import { CARD_ACCENT_COLORS, getAccentIndex } from "@/features/home/opportunity-card-colors"
+
 function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const deleteOpportunity = useDeleteOpportunity()
@@ -52,7 +54,7 @@ function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
   const hasCoverLetter = !coverLetter.isPending && coverLetter.data !== null
 
   return (
-    <Card>
+    <Card className={`border-t-[3px] ${CARD_ACCENT_COLORS[getAccentIndex(opportunity.id)]}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
