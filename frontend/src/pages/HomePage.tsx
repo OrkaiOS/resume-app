@@ -94,7 +94,7 @@ function HomePage() {
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog() }}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>
                 {editingOpportunity ? S.home.editOpportunity : S.home.newOpportunity}
