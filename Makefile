@@ -23,11 +23,13 @@ BACKEND_PORT ?= 8080
 # @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
 # @orkai:decision air replaces go run for FR-005 live reload; air is dev-only (not in go.mod), inherits env so config.Load + /health + /metrics stay intact
 dev:
-	@command -v air >/dev/null 2>&1 || { \
+	@PATH="$$HOME/go/bin:$$PATH"; \
+	command -v air >/dev/null 2>&1 || { \
 		echo "air not found. Install: go install github.com/air-verse/air@latest"; \
+		echo "Then retry with: PATH=\"\$$HOME/go/bin:\$$PATH\" make dev"; \
 		exit 1; \
-	}
-	@trap 'kill 0' INT TERM; \
+	}; \
+	trap 'kill 0' INT TERM; \
 	(cd frontend && VITE_DEV_PORT=$(VITE_DEV_PORT) VITE_BACKEND_PORT=$(BACKEND_PORT) npm run dev) & \
 	(cd backend && CORS_ALLOWED_ORIGINS=http://localhost:$(VITE_DEV_PORT) BACKEND_PORT=$(BACKEND_PORT) air) & \
 	wait
