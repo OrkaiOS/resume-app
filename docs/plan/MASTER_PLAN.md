@@ -12,6 +12,12 @@ _None — all plans completed._
 
 ## Completed Plans
 
+### Bug fix — opportunity dialog layout (`4baa8cc6-c55a-4e54-9d46-8da072470429`) — done
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Dialog layout fixes | `26015b17-17cf-46d8-b18d-a2896c51acde` | T1: Constrain textarea growth and widen dialog (`86995cd0`) ✅ · T2: Add colored accent bar to opportunity cards (`21ec0ef9`) ✅ |
+
 ### UX Improvement — Opportunity form as Dialog modal (`b1a389e9-6d8a-4bb8-9ee2-48c5da9c9c4b`) — done
 
 | # | Milestone | ID | Tasks |
