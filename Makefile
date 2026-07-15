@@ -16,6 +16,10 @@ install: build
 		cp backend/bin/resume-app /usr/local/bin/orkai-resume; \
 	fi
 
+# Default ports — override with: make dev VITE_DEV_PORT=5180 BACKEND_PORT=5181
+VITE_DEV_PORT ?= 5173
+BACKEND_PORT ?= 8080
+
 # @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
 # @orkai:decision air replaces go run for FR-005 live reload; air is dev-only (not in go.mod), inherits env so config.Load + /health + /metrics stay intact
 dev:
@@ -24,8 +28,8 @@ dev:
 		exit 1; \
 	}
 	@trap 'kill 0' INT TERM; \
-	(cd frontend && npm run dev) & \
-	(cd backend && air) & \
+	(cd frontend && VITE_DEV_PORT=$(VITE_DEV_PORT) VITE_BACKEND_PORT=$(BACKEND_PORT) npm run dev) & \
+	(cd backend && CORS_ALLOWED_ORIGINS=http://localhost:$(VITE_DEV_PORT) BACKEND_PORT=$(BACKEND_PORT) air) & \
 	wait
 
 clean:
