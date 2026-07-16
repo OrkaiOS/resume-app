@@ -8,6 +8,7 @@ import BackendStatusPage from "@/pages/BackendStatusPage"
 import OnboardingPage from "@/pages/OnboardingPage"
 import OrkaiStatusPage from "@/pages/OrkaiStatusPage"
 import HomePage from "@/pages/HomePage"
+import GlassCanvas from "@/components/ui/glass-canvas"
 
 const ChatPage = lazy(() => import("@/pages/ChatPage"))
 
@@ -67,6 +68,7 @@ function AppContent() {
 function App() {
   return (
     <BackendHealthProvider>
+      <GlassCanvas />
       <AppContent />
     </BackendHealthProvider>
   )
