@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest"
-import { useStyleStore } from "@/store/style-store"
 import GlassCanvas, { GlassCanvas as NamedExport } from "@/components/ui/glass-canvas"
 
 describe("GlassCanvas", () => {
@@ -11,22 +10,42 @@ describe("GlassCanvas", () => {
     expect(NamedExport).toBe(GlassCanvas)
   })
 
-  describe("visibility logic", () => {
-    it("store reflects glass style after setStyle", () => {
-      useStyleStore.getState().setStyle("glass")
-      const { style } = useStyleStore.getState()
-      expect(style).toBe("glass")
-    })
+  it("has a display name", () => {
+    expect(GlassCanvas.name).toBe("GlassCanvas")
+  })
 
-    it("store reflects default style after setStyle", () => {
-      useStyleStore.getState().setStyle("default")
-      const { style } = useStyleStore.getState()
-      expect(style).toBe("default")
-    })
+  it("always renders a container div", () => {
+    const result = GlassCanvas({})
+    expect(result).toBeDefined()
+    expect(result.type).toBe("div")
+  })
 
-    it("style values are only 'default' or 'glass'", () => {
-      const { style } = useStyleStore.getState()
-      expect(["default", "glass"]).toContain(style)
-    })
+  it("container has aria-hidden for accessibility", () => {
+    const result = GlassCanvas({})
+    expect(result.props).toBeDefined()
+    expect(result.props["aria-hidden"]).toBe("true")
+  })
+
+  it("container has hidden class and data-style glass visibility class", () => {
+    const result = GlassCanvas({})
+    const className = result.props.className
+    expect(className).toContain("hidden")
+    expect(className).toContain("[data-style=glass]:block")
+  })
+
+  it("contains three gradient blob children", () => {
+    const result = GlassCanvas({})
+    expect(result.props.children).toBeDefined()
+    expect(result.props.children).toHaveLength(3)
+  })
+
+  it("gradient blobs include motion-safe animation classes", () => {
+    const result = GlassCanvas({})
+    const blobs = result.props.children
+    if (Array.isArray(blobs)) {
+      for (const blob of blobs) {
+        expect(blob.props.className).toContain("motion-safe:animate-pulse")
+      }
+    }
   })
 })

@@ -1,15 +1,9 @@
-import { useStyleStore } from "@/store/style-store"
-
 interface Props {}
 
 function GlassCanvas(_props: Props) {
-  const style = useStyleStore((s) => s.style)
-
-  if (style !== "glass") return null
-
   return (
     <div
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden hidden [data-style=glass]:block"
       aria-hidden="true"
     >
       <div className="absolute -left-32 top-1/4 size-96 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-chart-2/10 blur-3xl motion-safe:animate-pulse" />
