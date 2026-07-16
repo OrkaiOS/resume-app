@@ -89,8 +89,19 @@ func TestCoverLetter_GetByOpportunity_NotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/api/opportunities/o1/cover-letter", nil)
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != 404 {
-		t.Fatalf("status = %d, want 404", rec.Code)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var env Envelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if env.Data != nil {
+		t.Fatalf("data = %+v, want nil", env.Data)
+	}
+	if env.Error != nil {
+		t.Fatalf("error = %+v, want nil", env.Error)
 	}
 }
 

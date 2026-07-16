@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/marco/resume-app/internal/models"
+	"github.com/marco/resume-app/internal/store"
 )
 
 type coverLetterService interface {
@@ -53,6 +55,10 @@ func (h *CoverLetterHandler) GetByOpportunity(c *gin.Context) {
 
 	cl, err := h.svc.GetByOpportunity(c, opportunityID)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			c.JSON(http.StatusOK, Success(nil))
+			return
+		}
 		status, code := mapError(err)
 		respondError(c, status, code, err.Error())
 		return
