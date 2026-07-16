@@ -55,6 +55,10 @@ func (h *ResumeHandler) GetByOpportunity(c *gin.Context) {
 
 	r, err := h.svc.GetByOpportunity(c, opportunityID)
 	if err != nil {
+		if isNotFound(err) {
+			c.JSON(http.StatusOK, Success(nil))
+			return
+		}
 		status, code := mapError(err)
 		respondError(c, status, code, err.Error())
 		return
