@@ -836,18 +836,46 @@ Acceptance criteria:
 
 ### 3.7 Design System
 
-#### FR-060 — Grayscale Simplicity Design (P0)
+#### FR-060 — Dual Design Languages (P0)
 
-**As a** User, **I want** the UI to follow a grayscale simplicity design
-language, **so that** the interface is clean, professional, and distraction-free.
+**As a** User, **I want** the UI to support two design languages — Default and
+Glass — **so that** I can choose the aesthetic that suits my preference.
 
 Acceptance criteria:
-- Color palette is predominantly grayscale (white, grays, black)
-- Accent colors are used sparingly for primary actions and status indicators
-- Typography follows a clean, readable hierarchy
-- Spacing and layout mirror the simplicity of tools like Google Analytics and Google Cloud Console
-- Dark mode is not required for v1
-- shadcn/ui components are themed to match the grayscale palette
+
+**Default style** (warm minimal):
+- Color palette is warm-minimal: warm off-white page canvas (`oklch(0.985 0.003 95)`), pure white cards, warm gray text and borders
+- Single accent color (`--primary`: warm indigo-purple) used sparingly for primary actions and focus rings
+- Depth conveyed through brightness contrast and subtle hairline rings, not drop shadows
+- Typography follows a clean, readable hierarchy (Geist Variable)
+- shadcn/ui components are themed to match the warm-minimal palette
+
+**Glass style:**
+- Translucent surfaces with backdrop-blur replace solid backgrounds
+- Gradient blob decorations on the background canvas create visual depth
+- Semi-transparent borders replace solid hairline rings
+- Depth conveyed through blur amount, transparency level, and shadow
+- Same typography, spacing, and component structure as Default — only surface treatment changes
+
+**Shared across both styles:**
+- Light-only (no dark mode in v1)
+- All component states (hover, focus, active, disabled, loading, empty, error) work identically in both styles
+- Text contrast meets AA standards (4.5:1 body, 3:1 large) in both styles
+- Single `data-style` attribute on `<html>` drives which CSS variable set is active; components never branch on style
+
+#### FR-061 — Style Switcher (P2)
+
+**As a** User, **I want to** switch between Default and Glass design languages
+via a header control, **so that** I can choose my preferred visual style at any
+time.
+
+Acceptance criteria:
+- A style switcher control (icon button or toggle) is visible in the application header
+- Clicking/switching instantly changes the active design language (no page reload)
+- Current style preference is persisted to `localStorage`
+- On next visit, the persisted preference is applied before first paint (no flash of wrong style)
+- Both styles render correctly with no visual glitches or missing tokens
+- The switcher shows the current active style visually (e.g., active icon highlighted)
 
 ---
 
@@ -1073,6 +1101,7 @@ Database stores:
 | 0.2.1 | 2026-07-05 | — | Refinement — expanded onboarding with 7 orkai entities, added cover letter writing rules (FR-036), added accepted document write-back to orkai (FR-037), specified pandoc+weasyprint PDF pipeline with CSS tuning, added authoritative profile source rule |
 | 0.2.2 | 2026-07-06 | — | Refinement — documented assistant-ui as the chat frontend framework (FR-030), added design constraint in §2.4, added reference in §1.4 |
 | 0.2.3 | 2026-07-07 | — | Discovery — added FR-038 (reasoning stream visibility, P0), FR-039 (session save/update agent tool, P0); refined FR-030 (Stop & Continue with session checkpoint), FR-031 (load User Insights standard into system prompt), FR-032 (overview tool, save_session/update_session, save_user_insight), FR-034 (overview-based continuity from prior session summaries), FR-035 (ephemeral raw messages + distilled session summary persistence); resolved Open Question #4 (tone captured dynamically as User Insights standard, not a fixed enum) |
+| 0.2.4 | 2026-07-15 | — | Refinement — evolved FR-060 from "Grayscale Simplicity" to "Dual Design Languages" (Default + Glass); added FR-061 (Style Switcher, P2) with localStorage persistence and data-style attribute mechanism |
 
 ### 6.2 Open Questions
 
@@ -1088,4 +1117,4 @@ Database stores:
 |----------|-------|-----------|
 | P0 | 28 | `make run`, reverse proxy, orkai health gate, onboarding, opportunity cards, empty state, chat interface (incl. Stop & Continue with session checkpoint), agent system prompt (incl. User Insights standard), agent tools (incl. overview, save_session/update_session, save_user_insight), chat session lifecycle (overview-based continuity), distilled session persistence (ephemeral raw + saved summary), cover letter writing rules, draft mode, document buttons, review panel, approve button, PDF download links, PDF in new tab, revision loop, profile, opportunity, resume, cover letter data models, grayscale design, PDF export (resume + cover letter via pandoc+weasyprint), reasoning stream visibility (FR-038), session save/update agent tool (FR-039), health/metrics, CORS, API key security, sandboxed shell, NFR-01–03 |
 | P1 | 12 | Global install, dev mode, onboarding progress, pagination, filters, search, sorting, artifact trigger, accepted document persistence to orkai, chat-based approval, thumbs up, artifact storage, Prometheus metrics, responsive layout, timestamps, keyboard shortcuts, form persistence |
-| P2 | 1 | Archive opportunity |
+| P2 | 2 | Archive opportunity, style switcher |

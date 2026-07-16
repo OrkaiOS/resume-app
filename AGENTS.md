@@ -198,9 +198,9 @@ introduce stacks outside this list.
 
 ### Branch-per-task policy (MANDATORY)
 
-Every implementation task ships on a feature branch and merges to `main` only
-after all gates pass. Solo local-first project — no PRs, no review-by-others,
-but branch-per-task is still required for traceability and clean rollback.
+Every implementation task ships on a feature branch. Solo local-first project —
+no PRs, no review-by-others, but branch-per-task is still required for
+traceability and clean rollback.
 
 - **Branch name**: `feat/<milestone>-<task>-<slug>` (e.g. `feat/m1-t1-init-go-module`).
   The slug is a 3-5 word kebab-case summary of the task. Derive `<milestone>`
@@ -209,19 +209,13 @@ but branch-per-task is still required for traceability and clean rollback.
   `git checkout main && git pull && git checkout -b feat/<milestone>-<task>-<slug>`.
 - **Run all gates** on the branch (build, vet/test/lint/typecheck, unit,
   integration, smoke). No gate may be skipped.
-- **Merge to `main`** with `--no-ff` so each task is a discoverable merge
-  commit in history: `git checkout main && git merge --no-ff
-  feat/<milestone>-<task>-<slug> -m "merge: <milestone> <task> <slug>"`.
-- **Delete the feature branch** after merge:
-  `git branch -d feat/<milestone>-<task>-<slug>`.
 - **Never commit implementation work directly to `main`.** Only `docs`,
   `chore`, `config`, or `fix` changes that are NOT tied to an implementation
   task may skip the branch rule (e.g. updating AGENTS.md, wiring
   `.orkai.yaml`). When in doubt, branch.
 - The Developer workflows enforce this: "Create Branch" runs before
-  "Implement Code", "Merge to Main" runs after all tests pass. The Feature
-  Planner writes the branch name into each task body so the Developer
-  workflow has a deterministic name to use.
+  "Implement Code". The Feature Planner writes the branch name into each
+  task body so the Developer workflow has a deterministic name to use.
 
 ### Build & Test Commands
 
@@ -301,12 +295,12 @@ Developer workflow directly. It does its own lightweight plan (one batched
 search, one plan > one milestone > 1–3 vertical-slice tasks covering both
 surfaces), implements backend + frontend in one branch per task, writes unit
 tests, runs all backend + frontend gates (ZERO diagnostics), runs Playwright
-self-QA in the same session, merges with `--no-ff`, escalates orkai review false
-positives to the Architect (same commit-hash format as the other developers).
+self-QA in the same session, escalates orkai review false positives to the
+Architect (same commit-hash format as the other developers).
 Cost-efficiency moves vs the role pipeline: standards documented via inline
 `@orkai:ref` and `@orkai:decision` source tags (materialized once at index time,
 not via per-entity `annotations(create)` / `entity(update, relations)` tool
-calls); one batched search instead of sequential; one branch + one merge per
+calls); one batched search instead of sequential; one branch per
 vertical-slice task (both surfaces) instead of one per task per surface;
 `orkai index .` once per milestone instead of per task; no separate smoke test
 (QA boot validates `/health` and frontend render). The `@orkai` tag pattern is

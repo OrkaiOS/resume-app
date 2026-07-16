@@ -6,7 +6,11 @@
 
 ## Active Plans
 
-_None — all plans completed._
+### Glassmorphism Design System (`39d50ea9-45d3-45cc-8964-6261fc3c8c4d`)
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Glassmorphism Foundation | `59821748-6525-4793-9b1f-c235894fb1d8` | T1: Dual CSS token system (`c99e9610`) · T2: Style switcher + Zustand store (`544f0dc5`) · T3: GlassCanvas + page integration (`3756b25c`) |
 
 ---
 
