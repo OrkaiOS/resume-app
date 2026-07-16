@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Loader2, Plus, AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { StyleSwitcher } from "@/components/ui/style-switcher"
 import {
   Dialog,
   DialogContent,
@@ -78,17 +79,20 @@ function HomePage() {
             </h1>
             <p className="text-sm text-muted-foreground">{S.home.subtitle}</p>
           </div>
-          <Button
-            type="button"
-            onClick={() => {
-              setEditingOpportunity(null)
-              setShowCreate(true)
-            }}
-            className="gap-2"
-          >
-            <Plus className="size-4" />
-            {S.home.newOpportunity}
-          </Button>
+          <div className="flex items-center gap-3">
+            <StyleSwitcher />
+            <Button
+              type="button"
+              onClick={() => {
+                setEditingOpportunity(null)
+                setShowCreate(true)
+              }}
+              className="gap-2"
+            >
+              <Plus className="size-4" />
+              {S.home.newOpportunity}
+            </Button>
+          </div>
         </div>
       </header>
 
