@@ -12,6 +12,12 @@
 |---|-----------|-----|-------|
 | M1 | Glassmorphism Foundation | `59821748-6525-4793-9b1f-c235894fb1d8` | T1: Dual CSS token system (`c99e9610`) · T2: Style switcher + Zustand store (`544f0dc5`) · T3: GlassCanvas + page integration (`3756b25c`) |
 
+### PDF Generation Pipeline (`dbdd0d22-1cd3-43b3-8ef6-2dc0b0bc3c04`)
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | PDF Generation Pipeline | `8ed53c37-21e1-4afc-a7cb-6a964455a32e` | T1: PDF Service + CSS templates (`0d767c52`) · T2: generate_pdf agent tool + system prompt (`524e692d`) · T3: PDF download endpoints (`bd0b04a8`) · T4: PDF links open in new tab (`d998df67`) |
+
 ### Onboarding — Project Name Validation (`34a22fe1-c5e3-407e-853c-2bdd976860cd`)
 
 | # | Milestone | ID | Tasks |
