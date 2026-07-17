@@ -12,6 +12,12 @@
 |---|-----------|-----|-------|
 | M1 | Glassmorphism Foundation | `59821748-6525-4793-9b1f-c235894fb1d8` | T1: Dual CSS token system (`c99e9610`) · T2: Style switcher + Zustand store (`544f0dc5`) · T3: GlassCanvas + page integration (`3756b25c`) |
 
+### Onboarding — Project Name Validation (`34a22fe1-c5e3-407e-853c-2bdd976860cd`)
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Project Name Validation | `5b4d38ec-f579-434a-821a-7b255b0cfcbf` | T1: Backend — Project Name as category name + uniqueness check (`ebf68cac`) · T2: Frontend — Project Name input on Orkai Setup (`46af24fb`) |
+
 ---
 
 ## Completed Plans

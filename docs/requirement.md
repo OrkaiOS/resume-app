@@ -185,9 +185,23 @@ Acceptance criteria:
 The backend uses the orkai MCP to create or resolve the following entities in the
 user's workspace. All operations run in sequence with real-time progress display.
 
-1. **Category (workspace):** Creates or resolves a category named `personal` to
-   scope all orkai entities for this app. The category ID is stored for use in
-   all subsequent orkai operations.
+1. **Project Name selection & Category (workspace):** The user enters a
+   **Project Name** — this becomes the name of the orkai category that scopes
+   all of this app's entities. The name is **not hardcoded** (a previous default
+   of `personal` caused silent duplicate categories because orkai does not
+   enforce category-name uniqueness — see §6.1 v0.2.5).
+   - First onboarding: the backend calls `categories(action: "list")`; if the
+     chosen name already exists in the user's orkai workspace, the UI blocks
+     continue with "A workspace named '<name>' already exists in orkai. Choose
+     another name." The user must enter a unique name to proceed.
+   - The category is then created via `categories(action: "create", name:
+     <Project Name>, description: "resume-app workspace")`; the resulting
+     category ID is stored in `user_settings.orkai_category_id` and used in all
+     subsequent orkai operations.
+   - Re-onboarding (profile/settings edit): the backend resolves the category by
+     **stored ID first**, then by stored name; only if both are absent does it
+     re-prompt for a Project Name. Re-onboarding **never** creates a new
+     category.
 
 2. **Canonical Profile standard:** Creates a standard containing the user's
    profile data (identity, contact, positioning, work history, education,
@@ -224,8 +238,12 @@ user's workspace. All operations run in sequence with real-time progress display
    fails, the user is prompted to paste the token manually.
 
 All created entity IDs are stored in the SQLite database for runtime retrieval
-during document generation. Re-onboarding (when the user edits their profile
-or settings) updates existing entities by ID — never creates duplicates.
+during document generation. **Re-onboarding (when the user edits their profile
+or settings) always reuses the stored category ID (step 1 above) and updates
+existing standards/skills by ID — it never creates a new category and never
+creates duplicate entities.** This is the single invariant that prevents
+orphaned duplicate workspace categories from accumulating across onboarding
+runs.
 
 #### FR-011 — Onboarding Progress Display (P1)
 
@@ -234,7 +252,7 @@ steps during onboarding, **so that** I know what is being set up and whether
 it succeeded.
 
 Acceptance criteria:
-- Each orkai setup step (create category, create profile standard, create cover letter principles standard, create PDF pipeline standard, create PDF generation skill, link entities, collect MCP token) shows a status indicator: pending, in-progress, success, or failed
+- Each orkai setup step (Project Name selection + uniqueness validation, create category, create profile standard, create cover letter principles standard, create PDF pipeline standard, create PDF generation skill, link entities, collect MCP token) shows a status indicator: pending, in-progress, success, or failed. A name conflict is surfaced inline ("A workspace named '<name>' already exists — choose another") with the input re-shown for correction before the category step can proceed.
 - If a step fails, a retry button is shown with the error message
 - The user can proceed with LLM config + profile even if orkai steps fail (but features remain blocked per FR-004)
 - Overall progress bar shows completion percentage
@@ -412,7 +430,9 @@ The agent has access to the following tools via the backend API:
    - Used by the agent to discover additional context beyond the system prompt
 
 5. **orkai Overview Tool**
-   - Calls orkai's `overview` operation scoped to the `personal` category
+   - Calls orkai's `overview` operation scoped to the user's resume-app orkai
+     category (the Project Name chosen at onboarding, stored in
+     `user_settings.orkai_category_id`)
    - Returns a limited view of: recent session summaries, available standards,
      available skills — i.e. what orkai knows is available for this project
    - This is the discovery mechanism the agent uses at session start (FR-034)
@@ -420,8 +440,9 @@ The agent has access to the following tools via the backend API:
      or "what standards/skills can I draw on" without a free-text search
 
 6. **Session Save/Update Tool**
-   - `save_session`: creates a new orkai `session` entity in the `personal`
-     category, linked to the opportunity via metadata (opportunityId, company,
+   - `save_session`: creates a new orkai `session` entity in the user's
+     resume-app orkai category (the Project Name chosen at onboarding), linked
+     to the opportunity via metadata (opportunityId, company,
      role, date). The content is a **distilled summary** — what was discussed,
      what was decided, what tone/style guidance emerged, what draft was
      produced, what's pending — NOT a transcript of raw messages.
@@ -442,7 +463,8 @@ The agent has access to the following tools via the backend API:
 
 7. **User Insight Capture Tool**
    - `save_user_insight`: create-or-update a **single** standard named
-     `User Insights — Resume & Cover Letter` in the `personal` orkai category.
+     `User Insights — Resume & Cover Letter` in the user's resume-app orkai
+      category (the Project Name chosen at onboarding).
      If the standard already exists, the tool **updates** it (merge/append new
      insights); it never creates duplicates.
    - The agent identifies user-revealed information with lasting relevance:
@@ -481,7 +503,8 @@ without replaying stale raw conversation.
 Acceptance criteria:
 - "Open Agent" from an opportunity card starts a new chat session
 - At session start the agent calls the `overview` tool (FR-032) scoped to the
-  `personal` category and retrieves prior session summaries for this
+     user's resume-app orkai category (the Project Name chosen at onboarding)
+     and retrieves prior session summaries for this
   opportunity. It uses them as continuity context — what was discussed, what was
   decided, what drafts were produced, what's pending, what user insights
   emerged. Raw chat messages are never replayed.
@@ -623,7 +646,8 @@ Acceptance criteria:
 - The session content is a **distilled summary** — what was discussed, what was
   decided, what tone/style guidance emerged, what draft was produced, what's
   pending — NOT a transcript of raw messages
-- The session is stored as an orkai `session` entity in the `personal` category
+- The session is stored as an orkai `session` entity in the user's resume-app
+  orkai category (the Project Name chosen at onboarding)
   and linked to the opportunity via metadata (opportunityId, company, role,
   date)
 - `update_session` is used when a session already exists for the current
@@ -1033,7 +1057,7 @@ orkai workspace:
 
 | Entity Type | Name Pattern | Content |
 |---|---|---|
-| Category | `personal` | Scopes all resume-app entities |
+| Category | `{Project Name}` | Scopes all resume-app entities. The name is user-chosen during onboarding and must be unique across the user's orkai categories — see FR-010 step 1. |
 | Standard | `{Full Name} — Canonical Profile for Resume & Cover Letter Generation` | User's identity, contact, positioning, work history, education, skills, languages. Declares itself as the authoritative source. |
 | Standard | `Cover Letter Writing Principles — Personal Workspace ({Full Name})` | Content rules, tone, anti-patterns, pre-submission checklist, three-shape framing for referrals |
 | Standard | `Resume & Cover Letter PDF Pipeline — Tooling & CSS Tuning` | pandoc + weasyprint pipeline, CSS overrides for page targets, verification helpers |
@@ -1055,7 +1079,7 @@ previously accepted documents (FR-037).
 **Runtime — document write-back:**
 
 When a resume or cover letter is approved, the backend creates a document
-in the user's orkai workspace under the `personal` category with metadata
+in the user's orkai workspace under their resume-app orkai category (the Project Name chosen at onboarding) with metadata
 (type, company, role, date). These documents compound over time, grounding
 future generations in the user's real accepted output.
 
@@ -1102,6 +1126,7 @@ Database stores:
 | 0.2.2 | 2026-07-06 | — | Refinement — documented assistant-ui as the chat frontend framework (FR-030), added design constraint in §2.4, added reference in §1.4 |
 | 0.2.3 | 2026-07-07 | — | Discovery — added FR-038 (reasoning stream visibility, P0), FR-039 (session save/update agent tool, P0); refined FR-030 (Stop & Continue with session checkpoint), FR-031 (load User Insights standard into system prompt), FR-032 (overview tool, save_session/update_session, save_user_insight), FR-034 (overview-based continuity from prior session summaries), FR-035 (ephemeral raw messages + distilled session summary persistence); resolved Open Question #4 (tone captured dynamically as User Insights standard, not a fixed enum) |
 | 0.2.4 | 2026-07-15 | — | Refinement — evolved FR-060 from "Grayscale Simplicity" to "Dual Design Languages" (Default + Glass); added FR-061 (Style Switcher, P2) with localStorage persistence and data-style attribute mechanism |
+| 0.2.5 | 2026-07-17 | — | Bug-driven refinement — FR-010 step 1 + FR-011 + §5.2 + FR-032/FR-034/FR-039: replaced the hardcoded `personal` orkai category (which caused silent duplicate categories across onboarding runs because orkai does not enforce category-name uniqueness) with **user-chosen Project Name** + server-side uniqueness validation against `categories(list)`. Re-onboarding now resolves the category by stored ID first, then by name; never creates a new category. Cleanup complete: 8 duplicate `personal` categories found; 6 deleted (1 empty + 5 abandoned onboardings, 118 entities total); live QA env (`810bbbb5`) renamed `personal` → `resume-app-qa` via SQL; real `personal` workspace (`5e80dd6f`, 1231 entities) kept untouched. Future duplicates prevented by the Project Name validation defined in FR-010 step 1 (implementation pending). |
 
 ### 6.2 Open Questions
 
@@ -1110,11 +1135,12 @@ Database stores:
 3. Should the agent support multiple LLM providers simultaneously (e.g., use Anthropic for writing, Ollama for quick tasks)?
 4. ~~Should cover letters support a separate "tone" configuration (formal, conversational, enthusiastic)?~~ **Resolved in v0.2.3** — tone is captured dynamically as a User Insights standard (FR-032 `save_user_insight`, loaded into the system prompt by FR-031), not a fixed enum.
 5. What is the exact orkai MCP token collection mechanism across cursor, cline, and opencode — are the config file paths stable?
+6. ~~Should onboarding hardcode the orkai workspace category name (`personal`) or let the user choose?~~ **Resolved in v0.2.5** — hardcoding `personal` caused silent duplicate categories because orkai does not enforce name uniqueness. The user now chooses a **Project Name** during onboarding and the backend validates it against `categories(list)` before creating (FR-010 step 1).
 
 ### 6.3 Priority Summary
 
 | Priority | Count | Key Items |
 |----------|-------|-----------|
-| P0 | 28 | `make run`, reverse proxy, orkai health gate, onboarding, opportunity cards, empty state, chat interface (incl. Stop & Continue with session checkpoint), agent system prompt (incl. User Insights standard), agent tools (incl. overview, save_session/update_session, save_user_insight), chat session lifecycle (overview-based continuity), distilled session persistence (ephemeral raw + saved summary), cover letter writing rules, draft mode, document buttons, review panel, approve button, PDF download links, PDF in new tab, revision loop, profile, opportunity, resume, cover letter data models, grayscale design, PDF export (resume + cover letter via pandoc+weasyprint), reasoning stream visibility (FR-038), session save/update agent tool (FR-039), health/metrics, CORS, API key security, sandboxed shell, NFR-01–03 |
+| P0 | 28 | `make run`, reverse proxy, orkai health gate, onboarding (incl. Project Name uniqueness validation), opportunity cards, empty state, chat interface (incl. Stop & Continue with session checkpoint), agent system prompt (incl. User Insights standard), agent tools (incl. overview, save_session/update_session, save_user_insight), chat session lifecycle (overview-based continuity), distilled session persistence (ephemeral raw + saved summary), cover letter writing rules, draft mode, document buttons, review panel, approve button, PDF download links, PDF in new tab, revision loop, profile, opportunity, resume, cover letter data models, grayscale design, PDF export (resume + cover letter via pandoc+weasyprint), reasoning stream visibility (FR-038), session save/update agent tool (FR-039), health/metrics, CORS, API key security, sandboxed shell, NFR-01–03 |
 | P1 | 12 | Global install, dev mode, onboarding progress, pagination, filters, search, sorting, artifact trigger, accepted document persistence to orkai, chat-based approval, thumbs up, artifact storage, Prometheus metrics, responsive layout, timestamps, keyboard shortcuts, form persistence |
 | P2 | 2 | Archive opportunity, style switcher |
