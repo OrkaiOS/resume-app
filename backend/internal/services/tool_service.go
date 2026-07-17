@@ -129,24 +129,32 @@ func (s *OrkaiSearchService) Search(ctx context.Context, query string) (string, 
 // @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
 // @orkai:decision One registry owns all agent tools (shell, orkai_search, orkai_get, profile, artifacts, overview, save_session, update_session, save_user_insight). Per-call temp dirs for shell (per-session workspace is FR-034 scope). Errors from tools are returned as JSON {error:...} so the agent can react, not as Go errors that would abort the chat.
 type ToolRegistry struct {
-	shell     *ShellService
-	search    *OrkaiSearchService
-	orkai     *orkai.OrkaiClient
-	profile   *ProfileService
-	artifacts *ArtifactService
-	session   *SessionService
-	defs      []llm.ToolDefinition
+	shell       *ShellService
+	search      *OrkaiSearchService
+	orkai       *orkai.OrkaiClient
+	profile     *ProfileService
+	artifacts   *ArtifactService
+	session     *SessionService
+	pdf         *PDFService
+	opportunity *OpportunityService
+	resume      *ResumeService
+	coverLetter *CoverLetterService
+	defs        []llm.ToolDefinition
 }
 
 // NewToolRegistry builds a ToolRegistry wiring all tool services.
-func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboardingStore store.OnboardingStore, profile *ProfileService, artifacts *ArtifactService, session *SessionService) *ToolRegistry {
+func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboardingStore store.OnboardingStore, profile *ProfileService, artifacts *ArtifactService, session *SessionService, pdf *PDFService, opportunity *OpportunityService, resume *ResumeService, coverLetter *CoverLetterService) *ToolRegistry {
 	return &ToolRegistry{
-		shell:     shell,
-		search:    NewOrkaiSearchService(orkaiClient, onboardingStore),
-		orkai:     orkaiClient,
-		profile:   profile,
-		artifacts: artifacts,
-		session:   session,
+		shell:       shell,
+		search:      NewOrkaiSearchService(orkaiClient, onboardingStore),
+		orkai:       orkaiClient,
+		profile:     profile,
+		artifacts:   artifacts,
+		session:     session,
+		pdf:         pdf,
+		opportunity: opportunity,
+		resume:      resume,
+		coverLetter: coverLetter,
 		defs: []llm.ToolDefinition{
 			{
 				Name:        "shell",
@@ -259,6 +267,19 @@ func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboar
   "required": ["insight"]
 }`),
 			},
+			{
+				Name:        "generate_pdf",
+				Description: "Generate a PDF from markdown content and persist it. Use this when the user approves a resume or cover letter draft. The PDF is rendered via pandoc (Markdown→HTML) + WeasyPrint (HTML+CSS→PDF) using a professional CSS template, saved to disk, and the document record is updated. Returns a download URL you should include in your response.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "markdown": {"type": "string", "description": "The full markdown content of the document"},
+    "documentType": {"type": "string", "enum": ["resume", "cover_letter"], "description": "Document type"},
+    "opportunityId": {"type": "string", "description": "The opportunity ID this document belongs to"}
+  },
+  "required": ["markdown", "documentType", "opportunityId"]
+}`),
+			},
 		},
 	}
 }
@@ -296,6 +317,8 @@ func (r *ToolRegistry) Execute(ctx context.Context, call llm.ToolCall) (string, 
 		return r.execUpdateSession(ctx, call.Arguments)
 	case "save_user_insight":
 		return r.execSaveUserInsight(ctx, call.Arguments)
+	case "generate_pdf":
+		return r.execGeneratePdf(ctx, call.Arguments)
 	default:
 		return encodeJSON(map[string]string{"error": "unknown tool: " + call.Name})
 	}
@@ -480,6 +503,83 @@ func (r *ToolRegistry) execSaveUserInsight(ctx context.Context, argsJSON string)
 		return encodeJSON(map[string]string{"error": err.Error()})
 	}
 	return encodeJSON(map[string]string{"message": "Saved as a user insight for future sessions"})
+}
+
+func (r *ToolRegistry) execGeneratePdf(ctx context.Context, argsJSON string) (string, error) {
+	if r.pdf == nil {
+		return encodeJSON(map[string]string{"error": "PDF service not configured"})
+	}
+	if r.opportunity == nil {
+		return encodeJSON(map[string]string{"error": "opportunity service not configured"})
+	}
+	if r.resume == nil || r.coverLetter == nil {
+		return encodeJSON(map[string]string{"error": "document service not configured"})
+	}
+
+	var args struct {
+		Markdown      string `json:"markdown"`
+		DocumentType  string `json:"documentType"`
+		OpportunityID string `json:"opportunityId"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execGeneratePdf: parse args: %w", err)
+	}
+	if args.Markdown == "" {
+		return encodeJSON(map[string]string{"error": "markdown is required"})
+	}
+	if args.DocumentType != "resume" && args.DocumentType != "cover_letter" {
+		return encodeJSON(map[string]string{"error": "documentType must be 'resume' or 'cover_letter'"})
+	}
+	if args.OpportunityID == "" {
+		return encodeJSON(map[string]string{"error": "opportunityId is required"})
+	}
+
+	opp, err := r.opportunity.Get(ctx, args.OpportunityID)
+	if err != nil {
+		return encodeJSON(map[string]string{"error": fmt.Sprintf("opportunity not found: %v", err)})
+	}
+
+	var css string
+	docTypeLabel := "resume"
+	pdfResource := "resume"
+	if args.DocumentType == "cover_letter" {
+		css = coverLetterCSS
+		docTypeLabel = "cover-letter"
+		pdfResource = "cover-letter"
+	} else {
+		css = resumeCSS
+	}
+
+	result, err := r.pdf.Generate(ctx, args.Markdown, css, docTypeLabel, opp.Company, opp.Role)
+	if err != nil {
+		return encodeJSON(map[string]string{"error": fmt.Sprintf("PDF generation failed: %v", err)})
+	}
+
+	if args.DocumentType == "cover_letter" {
+		_, err = r.coverLetter.Upsert(ctx, models.CoverLetter{
+			OpportunityID:   args.OpportunityID,
+			MarkdownContent: args.Markdown,
+			PDFPath:         result.Path,
+			Status:          "approved",
+		})
+	} else {
+		_, err = r.resume.Upsert(ctx, models.Resume{
+			OpportunityID:   args.OpportunityID,
+			MarkdownContent: args.Markdown,
+			PDFPath:         result.Path,
+			Status:          "approved",
+		})
+	}
+	if err != nil {
+		return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to save document record: %v", err)})
+	}
+
+	downloadURL := fmt.Sprintf("/v1/api/opportunities/%s/%s/pdf", args.OpportunityID, pdfResource)
+	return encodeJSON(map[string]string{
+		"downloadUrl": downloadURL,
+		"filename":    result.Filename,
+		"message":     "PDF generated successfully",
+	})
 }
 
 func encodeJSON(v any) (string, error) {
