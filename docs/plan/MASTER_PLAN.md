@@ -6,27 +6,29 @@
 
 ## Active Plans
 
-### Glassmorphism Design System (`39d50ea9-45d3-45cc-8964-6261fc3c8c4d`)
-
-| # | Milestone | ID | Tasks |
-|---|-----------|-----|-------|
-| M1 | Glassmorphism Foundation | `59821748-6525-4793-9b1f-c235894fb1d8` | T1: Dual CSS token system (`c99e9610`) · T2: Style switcher + Zustand store (`544f0dc5`) · T3: GlassCanvas + page integration (`3756b25c`) |
-
 ### PDF Generation Pipeline (`dbdd0d22-1cd3-43b3-8ef6-2dc0b0bc3c04`)
+
+Pipeline: Markdown → HTML (**pandoc**) + CSS → PDF (**weasyprint**). Agent-driven `generate_pdf` tool + download endpoints + new-tab links.
 
 | # | Milestone | ID | Tasks |
 |---|-----------|-----|-------|
 | M1 | PDF Generation Pipeline | `8ed53c37-21e1-4afc-a7cb-6a964455a32e` | T1: PDF Service + CSS templates (`0d767c52`) · T2: generate_pdf agent tool + system prompt (`524e692d`) · T3: PDF download endpoints (`bd0b04a8`) · T4: PDF links open in new tab (`d998df67`) |
 
-### Onboarding — Project Name Validation (`34a22fe1-c5e3-407e-853c-2bdd976860cd`)
-
-| # | Milestone | ID | Tasks |
-|---|-----------|-----|-------|
-| M1 | Project Name Validation | `5b4d38ec-f579-434a-821a-7b255b0cfcbf` | T1: Backend — Project Name as category name + uniqueness check (`ebf68cac`) · T2: Frontend — Project Name input on Orkai Setup (`46af24fb`) |
-
 ---
 
 ## Completed Plans
+
+### Glassmorphism Design System (`39d50ea9-45d3-45cc-8964-6261fc3c8c4d`) — done
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Glassmorphism Foundation | `59821748-6525-4793-9b1f-c235894fb1d8` | T1: Dual CSS token system · T2: Style switcher + Zustand store · T3: GlassCanvas + page integration · bugfixes + QA ✅ |
+
+### Onboarding — Project Name Validation (`34a22fe1-c5e3-407e-853c-2bdd976860cd`) — done
+
+| # | Milestone | ID | Tasks |
+|---|-----------|-----|-------|
+| M1 | Project Name Validation | `5b4d38ec-f579-434a-821a-7b255b0cfcbf` | T1: Backend — Project Name as category name + uniqueness check · T2: Frontend — Project Name input on Orkai Setup ✅ |
 
 ### Bug fix — opportunity dialog layout (`4baa8cc6-c55a-4e54-9d46-8da072470429`) — done
 
