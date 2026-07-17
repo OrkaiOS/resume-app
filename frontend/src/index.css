@@ -106,6 +106,10 @@
     --glass-shadow: 0 4px 24px oklch(0 0 0 / 0.06);
 }
 
+html[data-style="glass"] .glass-canvas-visible {
+    display: block;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

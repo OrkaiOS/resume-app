@@ -26,11 +26,11 @@ describe("GlassCanvas", () => {
     expect(result.props["aria-hidden"]).toBe("true")
   })
 
-  it("container has hidden class and data-style glass visibility class", () => {
+  it("container has hidden class and glass-canvas-visible visibility class", () => {
     const result = GlassCanvas({})
     const className = result.props.className
     expect(className).toContain("hidden")
-    expect(className).toContain("[data-style=glass]:block")
+    expect(className).toContain("glass-canvas-visible")
   })
 
   it("contains three gradient blob children", () => {

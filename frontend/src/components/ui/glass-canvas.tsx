@@ -1,9 +1,13 @@
 interface Props {}
 
+// @orkai:decision glass-canvas-visible class is gated by html[data-style="glass"] in index.css
+// because Tailwind v4 arbitrary variants like [data-style=glass]:block target the element
+// itself, not ancestors. The global data-style lives on <html>, so a plain CSS rule in
+// index.css handles the ancestor-based visibility gating per the GlassCanvas Component rule.
 function GlassCanvas(_props: Props) {
   return (
     <div
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden hidden [data-style=glass]:block"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden hidden glass-canvas-visible"
       aria-hidden="true"
     >
       <div className="absolute -left-32 top-1/4 size-96 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-chart-2/10 blur-3xl motion-safe:animate-pulse" />
