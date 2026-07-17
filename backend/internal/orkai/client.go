@@ -197,17 +197,34 @@ func (c *OrkaiClient) ListCategoryNames(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("orkai.ListCategoryNames: %w", err)
 	}
 
-	var items []struct {
+	type catEntry struct {
 		Name string `json:"name"`
 	}
+
+	var items []catEntry
+
+	// Try direct array first (standard list response).
 	if err := json.Unmarshal(result, &items); err != nil {
-		var raw string
-		if err2 := json.Unmarshal(result, &raw); err2 == nil {
-			if err3 := json.Unmarshal([]byte(raw), &items); err3 != nil {
-				return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err3)
-			}
+		// Try wrapped: {"items": [...]}
+		var wrapper struct {
+			Items []catEntry `json:"items"`
+		}
+		if err2 := json.Unmarshal(result, &wrapper); err2 == nil && len(wrapper.Items) > 0 {
+			items = wrapper.Items
 		} else {
-			return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err)
+			// Try string-wrapped.
+			var raw string
+			if err3 := json.Unmarshal(result, &raw); err3 == nil {
+				if err4 := json.Unmarshal([]byte(raw), &items); err4 != nil {
+					// Try wrapped in string.
+					if err5 := json.Unmarshal([]byte(raw), &wrapper); err5 != nil {
+						return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err4)
+					}
+					items = wrapper.Items
+				}
+			} else {
+				return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err)
+			}
 		}
 	}
 
