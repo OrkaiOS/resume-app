@@ -10,6 +10,7 @@ import type {
   OnboardingStatus,
   ProfileResponse,
   ProfileUpsertRequest,
+  TriggerSetupRequest,
 } from "@/types/api"
 
 const onboardingKeys = {
@@ -99,8 +100,8 @@ export function useUploadProfile() {
 
 export function useTriggerSetup() {
   return useMutation({
-    mutationFn: () =>
-      apiPost<OrkaiSetupResponse>("/onboarding/orkai-setup", {}),
+    mutationFn: (input: TriggerSetupRequest) =>
+      apiPost<OrkaiSetupResponse>("/onboarding/orkai-setup", input),
     onError: (e: Error) => {
       toast.error(S.toast.setupTriggerFailed, {
         description: e.message,

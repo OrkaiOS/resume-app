@@ -218,3 +218,7 @@ export interface OnboardingStatus {
     orkaiSetup: boolean
   }
 }
+
+export interface TriggerSetupRequest {
+  projectName: string
+}

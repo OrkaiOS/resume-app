@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Loader2, RotateCcw, Check, Circle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 
@@ -11,10 +12,12 @@ import type { OrkaiSetupStep } from "@/types/api"
 interface OrkaiSetupSectionProps {
   disabled: boolean
   onComplete: () => void
+  alreadyOnboarded?: boolean
 }
 
 const SETUP_STEPS = [
-  "Create personal category",
+  "Project Name selection + uniqueness validation",
+  "Create workspace category",
   "Create profile standard",
   "Create cover letter principles",
   "Create PDF pipeline document",
@@ -36,15 +39,22 @@ function stepStatusIcon(status: OrkaiSetupStep["status"]) {
   }
 }
 
-function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
+function OrkaiSetupSection({ disabled, onComplete, alreadyOnboarded }: OrkaiSetupSectionProps) {
   const [setupId, setSetupId] = useState<string | null>(null)
   const [setupStarted, setSetupStarted] = useState(false)
+  const [projectName, setProjectName] = useState("")
+  const [projectNameTouched, setProjectNameTouched] = useState(false)
 
   const triggerSetup = useTriggerSetup()
   const { data: setupStatus, isLoading } = useSetupStatus(setupId ?? "", setupStarted)
 
   function handleStart() {
-    triggerSetup.mutate(undefined, {
+    const name = projectName.trim()
+    if (!name) {
+      setProjectNameTouched(true)
+      return
+    }
+    triggerSetup.mutate({ projectName: name }, {
       onSuccess: (res) => {
         if (res.data) {
           setSetupId(res.data.sessionId)
@@ -57,12 +67,20 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
   function handleRetry() {
     setSetupId(null)
     setSetupStarted(false)
+    setProjectNameTouched(false)
   }
 
   const steps = setupStatus?.steps ?? []
   const completedCount = steps.filter((s) => s.status === "success").length
   const progress = steps.length > 0 ? (completedCount / steps.length) * 100 : 0
   const isComplete = setupStatus?.completed ?? false
+
+  const step0Failed = steps[0]?.status === "failed"
+  const step0Error = steps[0]?.error ?? ""
+  const isConflictError = step0Failed && step0Error.includes("already exists")
+  const showEmptyError = projectNameTouched && !projectName.trim()
+
+  if (alreadyOnboarded) return null
 
   if (!setupStarted) {
     return (
@@ -71,9 +89,37 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
           Connect Orkai to your workspace with a one-click setup. This creates
           the standards, skills, and documents needed for resume generation.
         </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="project-name">
+            Project Name
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Choose a name for your workspace. This will organize your resume
+            standards, skills, and documents in Orkai.
+          </p>
+          <Input
+            id="project-name"
+            placeholder="e.g. My Resume 2026"
+            maxLength={64}
+            required
+            value={projectName}
+            onChange={(e) => {
+              setProjectName(e.target.value)
+              if (e.target.value.trim()) setProjectNameTouched(false)
+            }}
+            onBlur={() => setProjectNameTouched(true)}
+            disabled={disabled || triggerSetup.isPending}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && projectName.trim()) handleStart()
+            }}
+          />
+          {showEmptyError && (
+            <p className="text-sm text-destructive">Project name is required.</p>
+          )}
+        </div>
         <Button
           className="w-full"
-          disabled={disabled || triggerSetup.isPending}
+          disabled={disabled || triggerSetup.isPending || !projectName.trim()}
           onClick={handleStart}
         >
           {triggerSetup.isPending ? (
@@ -158,13 +204,45 @@ function OrkaiSetupSection({ disabled, onComplete }: OrkaiSetupSectionProps) {
         )}
       </div>
 
+      {isConflictError && (
+        <div className="space-y-3 rounded-md border border-destructive/50 p-3">
+          <p className="text-sm font-medium text-destructive">Workspace name already taken</p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="project-name-retry">
+              Project Name
+            </label>
+            <Input
+              id="project-name-retry"
+              placeholder="e.g. My Resume 2026"
+              maxLength={64}
+              required
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && projectName.trim()) handleRetry()
+              }}
+            />
+            <p className="text-sm text-destructive">
+              A workspace named &apos;{projectName}&apos; already exists in Orkai. Choose a different name to continue.
+            </p>
+          </div>
+          <Button
+            className="w-full"
+            disabled={!projectName.trim()}
+            onClick={handleRetry}
+          >
+            Retry Setup
+          </Button>
+        </div>
+      )}
+
       {isComplete && (
         <Button className="w-full" onClick={onComplete}>
           Finish
         </Button>
       )}
 
-      {!isComplete && steps.some((s) => s.status === "failed") && (
+      {!isComplete && steps.some((s) => s.status === "failed") && !isConflictError && (
         <div className="space-y-3">
           <Button
             className="w-full"
