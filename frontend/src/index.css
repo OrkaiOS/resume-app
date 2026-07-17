@@ -90,6 +90,7 @@
 }
 
 [data-style="glass"] {
+    --background: transparent;
     --card: oklch(1 0 0 / 0.65);
     --popover: oklch(1 0 0 / 0.85);
     --muted: oklch(0.965 0.005 95 / 0.5);
@@ -129,4 +130,12 @@ html[data-style="glass"] .glass-canvas-visible {
     .glass-surface-strong {
         @apply bg-glass-bg-strong backdrop-blur-[var(--glass-blur-strong)] ring-1 ring-glass-border-strong shadow-lg;
     }
+}
+
+html[data-style="glass"] [data-slot="card"] {
+    @apply bg-glass-bg backdrop-blur-[var(--glass-blur)] ring-1 ring-glass-border shadow-[var(--glass-shadow)];
+}
+
+html[data-style="glass"] [data-slot="dialog-content"] {
+    @apply bg-glass-bg-strong backdrop-blur-[var(--glass-blur-strong)] ring-1 ring-glass-border-strong shadow-lg;
 }
