@@ -183,6 +183,41 @@ func (c *OrkaiClient) dispatchResponse(data string) {
 	}
 }
 
+// @orkai:ref(id=a7108b40-a54d-48c6-b464-44a20684e990)
+// @orkai:decision ListCategoryNames returns all orkai category names via categories list. Used for uniqueness validation before creating a project workspace.
+func (c *OrkaiClient) ListCategoryNames(ctx context.Context) ([]string, error) {
+	if err := c.connect(); err != nil {
+		return nil, err
+	}
+
+	result, err := c.callTool(ctx, "categories", map[string]interface{}{
+		"action": "list",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("orkai.ListCategoryNames: %w", err)
+	}
+
+	var items []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(result, &items); err != nil {
+		var raw string
+		if err2 := json.Unmarshal(result, &raw); err2 == nil {
+			if err3 := json.Unmarshal([]byte(raw), &items); err3 != nil {
+				return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err3)
+			}
+		} else {
+			return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err)
+		}
+	}
+
+	names := make([]string, len(items))
+	for i, item := range items {
+		names[i] = item.Name
+	}
+	return names, nil
+}
+
 func (c *OrkaiClient) CreateCategory(ctx context.Context, name string) (string, error) {
 	if err := c.connect(); err != nil {
 		return "", err
@@ -191,7 +226,7 @@ func (c *OrkaiClient) CreateCategory(ctx context.Context, name string) (string, 
 	result, err := c.callTool(ctx, "categories", map[string]interface{}{
 		"action":      "create",
 		"name":        name,
-		"description": "User's personal resume-app workspace",
+		"description": "resume-app workspace",
 	})
 	if err != nil {
 		return "", fmt.Errorf("orkai.CreateCategory: %w", err)

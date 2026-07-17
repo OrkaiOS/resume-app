@@ -17,6 +17,7 @@ type OrkaiClient interface {
 	CreateStandard(ctx context.Context, name, text, categoryID string) (string, error)
 	CreateSkill(ctx context.Context, name, text, categoryID string) (string, error)
 	LinkEntities(ctx context.Context, sourceID, targetID string) error
+	ListCategoryNames(ctx context.Context) ([]string, error)
 }
 
 type SetupStep struct {
@@ -49,7 +50,8 @@ func NewOrkaiSetupServiceWithDetect(client OrkaiClient, s store.OnboardingStore,
 }
 
 var stepNames = []string{
-	"Create personal category",
+	"Project Name selection + uniqueness validation",
+	"Create workspace category",
 	"Create Canonical Profile standard",
 	"Create Cover Letter Principles standard",
 	"Create PDF Pipeline standard",
@@ -117,12 +119,29 @@ const pdfGenerationSkillTemplate = `# Resume and Cover Letter PDF Generation
 - Never hardcode personal information in the CSS or Makefile.
 `
 
-func (s *OrkaiSetupService) RunSetup(ctx context.Context, profile models.Profile) (string, <-chan SetupStep, error) {
+func (s *OrkaiSetupService) RunSetup(ctx context.Context, profile models.Profile, projectName string) (string, <-chan SetupStep, error) {
 	sessionID := uuid.New().String()
-	ch := make(chan SetupStep, 7)
+	ch := make(chan SetupStep, 8)
 
 	go func() {
 		defer close(ch)
+
+		existingNames, listErr := s.client.ListCategoryNames(ctx)
+		if listErr != nil {
+			ch <- SetupStep{Name: stepNames[0], Status: "failed", Error: listErr.Error()}
+			return
+		}
+		for _, name := range existingNames {
+			if name == projectName {
+				ch <- SetupStep{
+					Name:   stepNames[0],
+					Status: "failed",
+					Error:  fmt.Sprintf("A workspace named '%s' already exists in orkai. Choose another name.", projectName),
+				}
+				return
+			}
+		}
+		ch <- SetupStep{Name: stepNames[0], Status: "success"}
 
 		profileBody := fmt.Sprintf(
 			"# %s — Canonical Profile\n\nWhen any source document disagrees with this standard, this standard wins.\n\n%s",
@@ -135,32 +154,32 @@ func (s *OrkaiSetupService) RunSetup(ctx context.Context, profile models.Profile
 		pdfPipelineStdName := "Resume & Cover Letter PDF Pipeline — macOS Tooling & Senior CSS Tuning"
 		pdfSkillName := "Resume and Cover Letter PDF Generation"
 
-		categoryID, err := s.client.CreateCategory(ctx, "personal")
-		ch <- stepResult(0, err)
-		if err != nil {
-			return
-		}
-
-		profileStdID, err := s.client.CreateStandard(ctx, profileStdName, profileBody, categoryID)
+		categoryID, err := s.client.CreateCategory(ctx, projectName)
 		ch <- stepResult(1, err)
 		if err != nil {
 			return
 		}
 
-		coverLetterStdID, err := s.client.CreateStandard(ctx, coverLetterStdName, coverLetterPrinciplesTemplate, categoryID)
+		profileStdID, err := s.client.CreateStandard(ctx, profileStdName, profileBody, categoryID)
 		ch <- stepResult(2, err)
 		if err != nil {
 			return
 		}
 
-		pdfPipelineStdID, err := s.client.CreateStandard(ctx, pdfPipelineStdName, pdfPipelineTemplate, categoryID)
+		coverLetterStdID, err := s.client.CreateStandard(ctx, coverLetterStdName, coverLetterPrinciplesTemplate, categoryID)
 		ch <- stepResult(3, err)
 		if err != nil {
 			return
 		}
 
-		pdfSkillID, err := s.client.CreateSkill(ctx, pdfSkillName, pdfGenerationSkillTemplate, categoryID)
+		pdfPipelineStdID, err := s.client.CreateStandard(ctx, pdfPipelineStdName, pdfPipelineTemplate, categoryID)
 		ch <- stepResult(4, err)
+		if err != nil {
+			return
+		}
+
+		pdfSkillID, err := s.client.CreateSkill(ctx, pdfSkillName, pdfGenerationSkillTemplate, categoryID)
+		ch <- stepResult(5, err)
 		if err != nil {
 			return
 		}
@@ -169,17 +188,17 @@ func (s *OrkaiSetupService) RunSetup(ctx context.Context, profile models.Profile
 		if linkErr == nil {
 			linkErr = s.client.LinkEntities(ctx, coverLetterStdID, profileStdID)
 		}
-		ch <- stepResult(5, linkErr)
+		ch <- stepResult(6, linkErr)
 		if linkErr != nil {
 			return
 		}
 
 		_, tokenErr := s.detect()
 		if tokenErr != nil {
-			ch <- SetupStep{Name: stepNames[6], Status: "failed", Error: tokenErr.Error()}
+			ch <- SetupStep{Name: stepNames[7], Status: "failed", Error: tokenErr.Error()}
 			return
 		}
-		ch <- SetupStep{Name: stepNames[6], Status: "success"}
+		ch <- SetupStep{Name: stepNames[7], Status: "success"}
 
 		if err := s.store.UpsertOrkaiIDs(ctx, categoryID, profileStdID, coverLetterStdID, pdfPipelineStdID, pdfSkillID); err != nil {
 			log.Printf("services.OrkaiSetupService.RunSetup: UpsertOrkaiIDs: %v", err)
