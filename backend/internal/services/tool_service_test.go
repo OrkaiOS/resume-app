@@ -62,7 +62,7 @@ func TestShellServiceNonZeroExitCode(t *testing.T) {
 
 func TestToolRegistryExecuteShell(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "1",
@@ -83,7 +83,7 @@ func TestToolRegistryExecuteShell(t *testing.T) {
 
 func TestToolRegistryUnknownTool(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "2",
 		Name:      "unknown_tool",
@@ -99,16 +99,16 @@ func TestToolRegistryUnknownTool(t *testing.T) {
 
 func TestToolRegistryDefinitionsCount(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	defs := registry.Definitions()
-	if len(defs) != 11 {
-		t.Errorf("expected 11 tool definitions, got %d", len(defs))
+	if len(defs) != 12 {
+		t.Errorf("expected 12 tool definitions, got %d", len(defs))
 	}
 }
 
 func TestToolRegistryExecOverviewNoOrkai(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "3",
 		Name:      "overview",
@@ -124,7 +124,7 @@ func TestToolRegistryExecOverviewNoOrkai(t *testing.T) {
 
 func TestToolRegistryExecSaveSessionNoService(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "4",
 		Name:      "save_session",
@@ -140,7 +140,7 @@ func TestToolRegistryExecSaveSessionNoService(t *testing.T) {
 
 func TestToolRegistryExecUpdateSessionNoService(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "5",
 		Name:      "update_session",
@@ -156,7 +156,7 @@ func TestToolRegistryExecUpdateSessionNoService(t *testing.T) {
 
 func TestToolRegistryExecSaveUserInsightNoService(t *testing.T) {
 	t.Parallel()
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "6",
 		Name:      "save_user_insight",
@@ -172,10 +172,7 @@ func TestToolRegistryExecSaveUserInsightNoService(t *testing.T) {
 
 func TestToolRegistryExecSaveSessionMissingSummary(t *testing.T) {
 	t.Parallel()
-	// Create a registry with a session service but no orkai client — the
-	// session service will fail on the actual orkai call, but we want to
-	// test that the summary validation works first.
-	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil)
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	out, err := registry.Execute(context.Background(), llm.ToolCall{
 		ID:        "7",
 		Name:      "save_session",
@@ -186,5 +183,76 @@ func TestToolRegistryExecSaveSessionMissingSummary(t *testing.T) {
 	}
 	if !strings.Contains(out, "error") {
 		t.Errorf("expected error in output, got %q", out)
+	}
+}
+
+func TestToolRegistryGeneratePdfNoService(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "8",
+		Name:      "generate_pdf",
+		Arguments: `{"markdown":"# Test","documentType":"resume","opportunityId":"1"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "PDF service not configured") {
+		t.Errorf("expected 'PDF service not configured' error, got %q", out)
+	}
+}
+
+func TestToolRegistryGeneratePdfValidation(t *testing.T) {
+	t.Parallel()
+	pdfSvc := NewPDFService(t.TempDir())
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, pdfSvc, nil, nil, nil)
+
+	tests := []struct {
+		name    string
+		args    string
+		wantErr string
+	}{
+		{"missing opportunity service", `{"markdown":"# Test","documentType":"resume","opportunityId":"1"}`, "opportunity service not configured"},
+		{"invalid document type", `{"markdown":"# Test","documentType":"invalid","opportunityId":"1"}`, ""},
+		{"missing markdown", `{"markdown":"","documentType":"resume","opportunityId":"1"}`, ""},
+		{"missing opportunityId", `{"markdown":"# Test","documentType":"resume","opportunityId":""}`, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := registry.Execute(context.Background(), llm.ToolCall{
+				ID:        "9",
+				Name:      "generate_pdf",
+				Arguments: tt.args,
+			})
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tt.wantErr != "" && !strings.Contains(out, tt.wantErr) {
+				t.Errorf("expected output to contain %q, got %q", tt.wantErr, out)
+			}
+			if tt.wantErr == "" && !strings.Contains(out, "error") {
+				t.Errorf("expected error in output, got %q", out)
+			}
+		})
+	}
+}
+
+func TestToolRegistryGeneratePdfToolInDefinitions(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	defs := registry.Definitions()
+	found := false
+	for _, d := range defs {
+		if d.Name == "generate_pdf" {
+			found = true
+			if !strings.Contains(d.Description, "pandoc") || !strings.Contains(d.Description, "WeasyPrint") {
+				t.Errorf("generate_pdf description should mention pandoc and WeasyPrint, got %q", d.Description)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("generate_pdf tool not found in definitions")
 	}
 }

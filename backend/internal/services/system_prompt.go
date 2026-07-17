@@ -76,6 +76,8 @@ func (s *SystemPromptService) Build(ctx context.Context, opportunityID string) s
 
 	b.WriteString(mandatorySourceRule)
 
+	b.WriteString("\n\n## PDF GENERATION\n\nWhen the user approves a resume or cover letter, call the `generate_pdf` tool with the full markdown content, document type ('resume' or 'cover_letter'), and the opportunity ID. After generating, include the download link in your response so the user can open the PDF.\n")
+
 	return b.String()
 }
 
