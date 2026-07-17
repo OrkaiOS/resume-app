@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -238,5 +240,94 @@ func TestCoverLetter_ResponseEnvelope(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"markdownContent"`) {
 		t.Fatalf("response missing markdownContent: %s", rec.Body.String())
+	}
+}
+
+func TestCoverLetter_DownloadPDF_Success(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	pdfPath := filepath.Join(tmpDir, "Acme-Engineer-CoverLetter.pdf")
+	if err := os.WriteFile(pdfPath, []byte("%PDF-test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := &fakeCoverLetterService{
+		getByOpportunityFn: func(ctx context.Context, opportunityID string) (models.CoverLetter, error) {
+			return models.CoverLetter{
+				ID:              "cl1",
+				OpportunityID:   opportunityID,
+				PDFPath:         pdfPath,
+				MarkdownContent: "Dear Hiring Manager...",
+				Status:          "approved",
+			}, nil
+		},
+	}
+
+	router := gin.New()
+	h := NewCoverLetterHandler(svc)
+	router.GET("/v1/api/opportunities/:id/cover-letter/pdf", h.DownloadPDF)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/api/opportunities/o1/cover-letter/pdf", nil)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/pdf" {
+		t.Errorf("Content-Type = %q, want application/pdf", ct)
+	}
+	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, "inline") {
+		t.Errorf("Content-Disposition = %q, want inline", cd)
+	}
+}
+
+func TestCoverLetter_DownloadPDF_NotFound(t *testing.T) {
+	t.Parallel()
+
+	svc := &fakeCoverLetterService{
+		getByOpportunityFn: func(ctx context.Context, opportunityID string) (models.CoverLetter, error) {
+			return models.CoverLetter{}, store.ErrNotFound
+		},
+	}
+
+	router := gin.New()
+	h := NewCoverLetterHandler(svc)
+	router.GET("/v1/api/opportunities/:id/cover-letter/pdf", h.DownloadPDF)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/api/opportunities/o1/cover-letter/pdf", nil)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != 404 {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestCoverLetter_DownloadPDF_NoPDFPath(t *testing.T) {
+	t.Parallel()
+
+	svc := &fakeCoverLetterService{
+		getByOpportunityFn: func(ctx context.Context, opportunityID string) (models.CoverLetter, error) {
+			return models.CoverLetter{
+				ID:              "cl1",
+				OpportunityID:   opportunityID,
+				MarkdownContent: "Dear Hiring Manager...",
+				Status:          "draft",
+			}, nil
+		},
+	}
+
+	router := gin.New()
+	h := NewCoverLetterHandler(svc)
+	router.GET("/v1/api/opportunities/:id/cover-letter/pdf", h.DownloadPDF)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/api/opportunities/o1/cover-letter/pdf", nil)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != 404 {
+		t.Fatalf("status = %d, want 404", rec.Code)
 	}
 }

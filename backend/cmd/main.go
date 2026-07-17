@@ -126,10 +126,12 @@ func Run() error {
 	resumeHandler := handlers.NewResumeHandler(resumeSvc)
 	v1.GET("/opportunities/:id/resume", resumeHandler.GetByOpportunity)
 	v1.PUT("/opportunities/:id/resume", resumeHandler.Upsert)
+	v1.GET("/opportunities/:id/resume/pdf", resumeHandler.DownloadPDF)
 
 	coverLetterHandler := handlers.NewCoverLetterHandler(coverLetterSvc)
 	v1.GET("/opportunities/:id/cover-letter", coverLetterHandler.GetByOpportunity)
 	v1.PUT("/opportunities/:id/cover-letter", coverLetterHandler.Upsert)
+	v1.GET("/opportunities/:id/cover-letter/pdf", coverLetterHandler.DownloadPDF)
 
 	artifactHandler := handlers.NewArtifactHandler(artifactSvc)
 	v1.GET("/tools/artifacts", artifactHandler.List)
