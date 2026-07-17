@@ -74,13 +74,22 @@ func Load() (Config, error) {
 		orkaiMCPURL = "http://localhost:18787/mcp"
 	}
 
+	outputDir := os.Getenv("OUTPUT_DIR")
+	if outputDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return Config{}, fmt.Errorf("config.Load: cannot determine home directory for OUTPUT_DIR default: %w", err)
+		}
+		outputDir = filepath.Join(home, ".orkai-resume", "pdfs")
+	}
+
 	return Config{
 		Port:               port,
 		DBPath:             dbPath,
 		LLMProvider:        os.Getenv("LLM_PROVIDER"),
 		LLMModel:           os.Getenv("LLM_MODEL"),
 		LLMAPIKey:          os.Getenv("LLM_API_KEY"),
-		OutputDir:          os.Getenv("OUTPUT_DIR"),
+		OutputDir:          outputDir,
 		CORSAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
 		OrkaiHealthURL:     orkaiHealthURL,
 		OrkaiMCPURL:        orkaiMCPURL,
