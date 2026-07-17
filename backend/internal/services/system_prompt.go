@@ -69,6 +69,8 @@ func (s *SystemPromptService) Build(ctx context.Context, opportunityID string) s
 		opp, err := s.opportunityStore.Get(ctx, opportunityID)
 		if err == nil {
 			s.appendOpportunity(&b, opp)
+		} else {
+			b.WriteString(fmt.Sprintf("\n\n## JOB OPPORTUNITY\n\nOpportunity ID: %s\n\n", opportunityID))
 		}
 	}
 
@@ -157,6 +159,7 @@ func (s *SystemPromptService) appendProfile(b *strings.Builder, profile models.P
 
 func (s *SystemPromptService) appendOpportunity(b *strings.Builder, opp models.Opportunity) {
 	b.WriteString("\n\n## JOB OPPORTUNITY\n\n")
+	b.WriteString(fmt.Sprintf("Opportunity ID: %s\n", opp.ID))
 	b.WriteString(fmt.Sprintf("Company: %s\n", opp.Company))
 	b.WriteString(fmt.Sprintf("Role: %s\n", opp.Role))
 	if opp.Description != "" {
