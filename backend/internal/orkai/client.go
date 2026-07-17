@@ -203,29 +203,75 @@ func (c *OrkaiClient) ListCategoryNames(ctx context.Context) ([]string, error) {
 
 	var items []catEntry
 
-	// Try direct array first (standard list response).
-	if err := json.Unmarshal(result, &items); err != nil {
-		// Try wrapped: {"items": [...]}
-		var wrapper struct {
-			Items []catEntry `json:"items"`
+	// Direct array: [...]
+	if err := json.Unmarshal(result, &items); err == nil && len(items) > 0 {
+		names := make([]string, len(items))
+		for i, item := range items {
+			names[i] = item.Name
 		}
-		if err2 := json.Unmarshal(result, &wrapper); err2 == nil && len(wrapper.Items) > 0 {
-			items = wrapper.Items
-		} else {
-			// Try string-wrapped.
-			var raw string
-			if err3 := json.Unmarshal(result, &raw); err3 == nil {
-				if err4 := json.Unmarshal([]byte(raw), &items); err4 != nil {
-					// Try wrapped in string.
-					if err5 := json.Unmarshal([]byte(raw), &wrapper); err5 != nil {
-						return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err4)
-					}
-					items = wrapper.Items
+		return names, nil
+	}
+
+	// Try wrapped variants. Unmarshal into a generic map and extract names.
+	var raw []map[string]json.RawMessage
+	if err := json.Unmarshal(result, &raw); err == nil {
+		for _, obj := range raw {
+			if nameRaw, ok := obj["name"]; ok {
+				var name string
+				if err := json.Unmarshal(nameRaw, &name); err == nil {
+					items = append(items, catEntry{Name: name})
 				}
-			} else {
-				return nil, fmt.Errorf("orkai.ListCategoryNames: parse response: %w", err)
 			}
 		}
+		if len(items) > 0 {
+			names := make([]string, len(items))
+			for i, item := range items {
+				names[i] = item.Name
+			}
+			return names, nil
+		}
+	}
+
+	// Try as string first, then parse.
+	var rawStr string
+	if err := json.Unmarshal(result, &rawStr); err == nil {
+		result = json.RawMessage(rawStr)
+	}
+
+	// Try top-level object with "items" key.
+	var wrapper struct {
+		Items []catEntry `json:"items"`
+	}
+	if err := json.Unmarshal(result, &wrapper); err == nil && len(wrapper.Items) > 0 {
+		names := make([]string, len(wrapper.Items))
+		for i, item := range wrapper.Items {
+			names[i] = item.Name
+		}
+		return names, nil
+	}
+
+	// Try top-level object with data or results array.
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal(result, &generic); err == nil {
+		for _, key := range []string{"items", "data", "results", "categories"} {
+			if arrRaw, ok := generic[key]; ok {
+				var arr []map[string]json.RawMessage
+				if err := json.Unmarshal(arrRaw, &arr); err == nil {
+					for _, obj := range arr {
+						if nameRaw, ok := obj["name"]; ok {
+							var name string
+							if err := json.Unmarshal(nameRaw, &name); err == nil {
+								items = append(items, catEntry{Name: name})
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("orkai.ListCategoryNames: could not parse categories from response: %s", string(result))
 	}
 
 	names := make([]string, len(items))
