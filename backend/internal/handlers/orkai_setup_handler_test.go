@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -19,7 +20,7 @@ type mockOrkaiSetupSvc struct {
 	err       error
 }
 
-func (m *mockOrkaiSetupSvc) RunSetup(ctx context.Context, profile models.Profile) (string, <-chan services.SetupStep, error) {
+func (m *mockOrkaiSetupSvc) RunSetup(ctx context.Context, profile models.Profile, projectName string) (string, <-chan services.SetupStep, error) {
 	if m.err != nil {
 		return "", nil, m.err
 	}
@@ -36,7 +37,8 @@ func (m *mockProfileSvc) Get(ctx context.Context) (models.Profile, error) {
 }
 
 func emitSteps(ch chan services.SetupStep) {
-	ch <- services.SetupStep{Name: "Create personal category", Status: "success"}
+	ch <- services.SetupStep{Name: "Project Name selection + uniqueness validation", Status: "success"}
+	ch <- services.SetupStep{Name: "Create workspace category", Status: "success"}
 	ch <- services.SetupStep{Name: "Create Canonical Profile standard", Status: "success"}
 	ch <- services.SetupStep{Name: "Create Cover Letter Principles standard", Status: "success"}
 	ch <- services.SetupStep{Name: "Create PDF Pipeline standard", Status: "success"}
@@ -49,7 +51,7 @@ func emitSteps(ch chan services.SetupStep) {
 func TestOrkaiSetup_StartSetup_Success(t *testing.T) {
 	t.Parallel()
 
-	ch := make(chan services.SetupStep, 7)
+	ch := make(chan services.SetupStep, 8)
 	svc := &mockOrkaiSetupSvc{sessionID: "test-session-1", ch: ch}
 	profile := &mockProfileSvc{
 		profile: models.Profile{FullName: "Jane Doe", Email: "jane@example.com"},
@@ -60,7 +62,8 @@ func TestOrkaiSetup_StartSetup_Success(t *testing.T) {
 	go emitSteps(ch)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", bytes.NewReader([]byte(`{"projectName":"My Workspace"}`)))
+	req.Header.Set("Content-Type", "application/json")
 
 	router := gin.New()
 	router.POST("/v1/api/onboarding/orkai-setup", handler.StartSetup)
@@ -87,10 +90,41 @@ func TestOrkaiSetup_StartSetup_Success(t *testing.T) {
 	}
 }
 
+func TestOrkaiSetup_StartSetup_EmptyProjectName(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockOrkaiSetupSvc{}
+	profile := &mockProfileSvc{
+		profile: models.Profile{FullName: "Jane Doe"},
+	}
+
+	handler := NewOrkaiSetupHandler(svc, profile)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", bytes.NewReader([]byte(`{}`)))
+	req.Header.Set("Content-Type", "application/json")
+
+	router := gin.New()
+	router.POST("/v1/api/onboarding/orkai-setup", handler.StartSetup)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
+	}
+
+	var env Envelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if env.Error == nil || env.Error.Code != ErrCodeValidation {
+		t.Fatalf("expected validation error, got: %+v", env.Error)
+	}
+}
+
 func TestOrkaiSetup_GetStatus_Success(t *testing.T) {
 	t.Parallel()
 
-	ch := make(chan services.SetupStep, 7)
+	ch := make(chan services.SetupStep, 8)
 	svc := &mockOrkaiSetupSvc{sessionID: "test-session-2", ch: ch}
 	profile := &mockProfileSvc{
 		profile: models.Profile{FullName: "John Smith", Email: "john@example.com"},
@@ -101,7 +135,8 @@ func TestOrkaiSetup_GetStatus_Success(t *testing.T) {
 	go emitSteps(ch)
 
 	startRec := httptest.NewRecorder()
-	startReq := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", nil)
+	startReq := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", bytes.NewReader([]byte(`{"projectName":"My Workspace"}`)))
+	startReq.Header.Set("Content-Type", "application/json")
 	router := gin.New()
 	router.POST("/v1/api/onboarding/orkai-setup", handler.StartSetup)
 	router.GET("/v1/api/onboarding/orkai-setup/status", handler.GetStatus)
@@ -132,8 +167,8 @@ func TestOrkaiSetup_GetStatus_Success(t *testing.T) {
 	if !ok {
 		t.Fatalf("steps is not an array: %T", data["steps"])
 	}
-	if len(steps) != 7 {
-		t.Errorf("steps length = %d, want 7", len(steps))
+	if len(steps) != 8 {
+		t.Errorf("steps length = %d, want 8", len(steps))
 	}
 }
 
@@ -200,7 +235,8 @@ func TestOrkaiSetup_StartSetup_ProfileNotFound(t *testing.T) {
 	handler := NewOrkaiSetupHandler(svc, profile)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", bytes.NewReader([]byte(`{"projectName":"Test"}`)))
+	req.Header.Set("Content-Type", "application/json")
 
 	router := gin.New()
 	router.POST("/v1/api/onboarding/orkai-setup", handler.StartSetup)
@@ -232,7 +268,8 @@ func TestOrkaiSetup_StartSetup_ServiceError(t *testing.T) {
 	handler := NewOrkaiSetupHandler(svc, profile)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/api/onboarding/orkai-setup", bytes.NewReader([]byte(`{"projectName":"Test"}`)))
+	req.Header.Set("Content-Type", "application/json")
 
 	router := gin.New()
 	router.POST("/v1/api/onboarding/orkai-setup", handler.StartSetup)

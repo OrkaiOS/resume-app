@@ -11,7 +11,7 @@ import (
 )
 
 type orkaiSetupService interface {
-	RunSetup(ctx context.Context, profile models.Profile) (sessionID string, ch <-chan services.SetupStep, err error)
+	RunSetup(ctx context.Context, profile models.Profile, projectName string) (sessionID string, ch <-chan services.SetupStep, err error)
 }
 
 type profileGetter interface {
@@ -33,6 +33,10 @@ func NewOrkaiSetupHandler(svc orkaiSetupService, profile profileGetter) *OrkaiSe
 	}
 }
 
+type orkaiSetupRequest struct {
+	ProjectName string `json:"projectName" binding:"required"`
+}
+
 type orkaiSetupResponse struct {
 	SessionID string `json:"sessionId"`
 }
@@ -50,6 +54,12 @@ type orkaiSetupStatusResponse struct {
 }
 
 func (h *OrkaiSetupHandler) StartSetup(c *gin.Context) {
+	var req orkaiSetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, ErrCodeValidation, "projectName is required")
+		return
+	}
+
 	p, err := h.profile.Get(c)
 	if err != nil {
 		status, code := mapError(err)
@@ -57,7 +67,7 @@ func (h *OrkaiSetupHandler) StartSetup(c *gin.Context) {
 		return
 	}
 
-	sessionID, ch, err := h.svc.RunSetup(c, p)
+	sessionID, ch, err := h.svc.RunSetup(c, p, req.ProjectName)
 	if err != nil {
 		status, code := mapError(err)
 		respondError(c, status, code, err.Error())
@@ -65,7 +75,7 @@ func (h *OrkaiSetupHandler) StartSetup(c *gin.Context) {
 	}
 
 	h.mu.Lock()
-	h.steps[sessionID] = make([]services.SetupStep, 7)
+	h.steps[sessionID] = make([]services.SetupStep, 8)
 	for i, name := range stepNames {
 		h.steps[sessionID][i] = services.SetupStep{
 			Name:   name,
@@ -134,7 +144,8 @@ func (h *OrkaiSetupHandler) consumeProgress(sessionID string, ch <-chan services
 }
 
 var stepNames = []string{
-	"Create personal category",
+	"Project Name selection + uniqueness validation",
+	"Create workspace category",
 	"Create Canonical Profile standard",
 	"Create Cover Letter Principles standard",
 	"Create PDF Pipeline standard",
