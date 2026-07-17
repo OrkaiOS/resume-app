@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/marco/resume-app/internal/models"
@@ -99,4 +101,27 @@ func (h *CoverLetterHandler) Upsert(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, Success(coverLetterToResponse(upserted)))
+}
+
+func (h *CoverLetterHandler) DownloadPDF(c *gin.Context) {
+	opportunityID := c.Param("id")
+
+	cl, err := h.svc.GetByOpportunity(c, opportunityID)
+	if err != nil {
+		if isNotFound(err) {
+			respondError(c, http.StatusNotFound, ErrCodeNotFound, "no cover letter found for this opportunity")
+			return
+		}
+		status, code := mapError(err)
+		respondError(c, status, code, err.Error())
+		return
+	}
+	if cl.PDFPath == "" {
+		respondError(c, http.StatusNotFound, ErrCodeNotFound, "no PDF generated for this cover letter yet")
+		return
+	}
+	filename := filepath.Base(cl.PDFPath)
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
+	c.File(cl.PDFPath)
 }
