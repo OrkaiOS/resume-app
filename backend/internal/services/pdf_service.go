@@ -59,7 +59,12 @@ func (s *PDFService) Generate(ctx context.Context, markdown, css, docType, compa
 	}
 
 	htmlPath := filepath.Join(workDir, "intermediate.html")
-	pandocCmd := exec.CommandContext(ctx, "pandoc", mdPath, "-o", htmlPath)
+	pandocCmd := exec.CommandContext(ctx, "pandoc",
+		mdPath, "-o", htmlPath,
+		"--standalone",
+		"--to=html5",
+		"-f", "markdown+smart",
+	)
 	if out, err := pandocCmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("pdf_service.Generate: pandoc failed: %w\n%s", err, string(out))
 	}

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { FileText, Mail, MessageSquare, Trash2, Pencil, Loader2 } from "lucide-react"
+import { FileText, Mail, MessageSquare, Download, Trash2, Pencil, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -128,17 +128,41 @@ function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <FileText
-                className={hasResume ? "size-3.5" : "size-3.5 opacity-40"}
-              />
-              <span>{hasResume ? "1" : "0"}</span>
-              <Mail
-                className={
-                  hasCoverLetter ? "size-3.5" : "size-3.5 opacity-40"
-                }
-              />
-              <span>{hasCoverLetter ? "1" : "0"}</span>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {hasResume && resume.data?.pdfPath ? (
+                <a
+                  href={`/v1/api/opportunities/${opportunity.id}/resume/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <FileText className="size-3.5" />
+                  <span>Resume</span>
+                  <Download className="size-3" />
+                </a>
+              ) : (
+                <span className={`flex items-center gap-1 ${hasResume ? "" : "opacity-40"}`}>
+                  <FileText className="size-3.5" />
+                  <span>{hasResume ? "1" : "0"}</span>
+                </span>
+              )}
+              {hasCoverLetter && coverLetter.data?.pdfPath ? (
+                <a
+                  href={`/v1/api/opportunities/${opportunity.id}/cover-letter/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Mail className="size-3.5" />
+                  <span>Cover</span>
+                  <Download className="size-3" />
+                </a>
+              ) : (
+                <span className={`flex items-center gap-1 ${hasCoverLetter ? "" : "opacity-40"}`}>
+                  <Mail className="size-3.5" />
+                  <span>{hasCoverLetter ? "1" : "0"}</span>
+                </span>
+              )}
             </div>
             <div className="ml-auto">
               <Button
