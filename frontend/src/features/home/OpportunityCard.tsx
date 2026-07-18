@@ -50,9 +50,6 @@ function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
     })
   }
 
-  const hasResume = !resume.isPending && resume.data !== null
-  const hasCoverLetter = !coverLetter.isPending && coverLetter.data !== null
-
   return (
     <Card className={`border-t-[3px] ${CARD_ACCENT_COLORS[getAccentIndex(opportunity.id)]}`}>
       <CardHeader>
@@ -129,7 +126,7 @@ function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
         ) : (
           <>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {hasResume && resume.data?.pdfPath ? (
+              {resume.data?.pdfPath ? (
                 <a
                   href={`/v1/api/opportunities/${opportunity.id}/resume/pdf`}
                   target="_blank"
@@ -140,13 +137,8 @@ function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
                   <span>Resume</span>
                   <Download className="size-3" />
                 </a>
-              ) : (
-                <span className={`flex items-center gap-1 ${hasResume ? "" : "opacity-40"}`}>
-                  <FileText className="size-3.5" />
-                  <span>{hasResume ? "1" : "0"}</span>
-                </span>
-              )}
-              {hasCoverLetter && coverLetter.data?.pdfPath ? (
+              ) : null}
+              {coverLetter.data?.pdfPath ? (
                 <a
                   href={`/v1/api/opportunities/${opportunity.id}/cover-letter/pdf`}
                   target="_blank"
@@ -157,12 +149,7 @@ function OpportunityCard({ opportunity, onEdit }: OpportunityCardProps) {
                   <span>Cover</span>
                   <Download className="size-3" />
                 </a>
-              ) : (
-                <span className={`flex items-center gap-1 ${hasCoverLetter ? "" : "opacity-40"}`}>
-                  <Mail className="size-3.5" />
-                  <span>{hasCoverLetter ? "1" : "0"}</span>
-                </span>
-              )}
+              ) : null}
             </div>
             <div className="ml-auto">
               <Button
