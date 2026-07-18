@@ -72,13 +72,13 @@ type AgentToolResult struct {
 }
 
 // NewChatAgentService builds a ChatAgentService with the standard
-// maxIterations of 5.
+// maxIterations of 10.
 func NewChatAgentService(client llm.Client, promptBuilder PromptBuilder, tools llm.ToolRegistry) *ChatAgentService {
 	return &ChatAgentService{
 		client:        client,
 		promptBuilder: promptBuilder,
 		tools:         tools,
-		maxIterations: 5,
+		maxIterations: 10,
 	}
 }
 
