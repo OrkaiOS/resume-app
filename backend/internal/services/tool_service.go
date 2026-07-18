@@ -582,14 +582,26 @@ func (r *ToolRegistry) execGeneratePdf(ctx context.Context, argsJSON string) (st
 	}
 
 	if args.DocumentType == "cover_letter" {
+		existing, getErr := r.coverLetter.GetByOpportunity(ctx, r.opportunityID)
+		id := ""
+		if getErr == nil {
+			id = existing.ID
+		}
 		_, err = r.coverLetter.Upsert(ctx, models.CoverLetter{
+			ID:              id,
 			OpportunityID:   r.opportunityID,
 			MarkdownContent: args.Markdown,
 			PDFPath:         result.Path,
 			Status:          "approved",
 		})
 	} else {
+		existing, getErr := r.resume.GetByOpportunity(ctx, r.opportunityID)
+		id := ""
+		if getErr == nil {
+			id = existing.ID
+		}
 		_, err = r.resume.Upsert(ctx, models.Resume{
+			ID:              id,
 			OpportunityID:   r.opportunityID,
 			MarkdownContent: args.Markdown,
 			PDFPath:         result.Path,
