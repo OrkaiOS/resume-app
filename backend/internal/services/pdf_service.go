@@ -69,9 +69,13 @@ func (s *PDFService) Generate(ctx context.Context, markdown, css, docType, compa
 		return nil, fmt.Errorf("pdf_service.Generate: pandoc failed: %w\n%s", err, string(out))
 	}
 
-	cssPath := filepath.Join(workDir, "style.css")
-	if err := os.WriteFile(cssPath, []byte(css), 0644); err != nil {
-		return nil, fmt.Errorf("pdf_service.Generate: cannot write CSS: %w", err)
+	html, err := os.ReadFile(htmlPath)
+	if err != nil {
+		return nil, fmt.Errorf("pdf_service.Generate: cannot read intermediate HTML: %w", err)
+	}
+	styledHTML := injectCSS(string(html), css)
+	if err := os.WriteFile(htmlPath, []byte(styledHTML), 0644); err != nil {
+		return nil, fmt.Errorf("pdf_service.Generate: cannot write styled HTML: %w", err)
 	}
 
 	sanitizedCompany := sanitize(company)
@@ -83,7 +87,7 @@ func (s *PDFService) Generate(ctx context.Context, markdown, css, docType, compa
 	filename := fmt.Sprintf("%s-%s-%s.pdf", sanitizedCompany, sanitizedRole, docLabel)
 	outPath := filepath.Join(s.outputDir, filename)
 
-	weasyCmd := exec.CommandContext(ctx, "weasyprint", htmlPath, outPath, "-s", cssPath)
+	weasyCmd := exec.CommandContext(ctx, "weasyprint", htmlPath, outPath)
 	if out, err := weasyCmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("pdf_service.Generate: weasyprint failed: %w\n%s", err, string(out))
 	}
@@ -106,4 +110,12 @@ func sanitize(s string) string {
 		return "Untitled"
 	}
 	return cleaned
+}
+
+func injectCSS(html, css string) string {
+	styleTag := "\n<style>\n" + css + "\n</style>\n"
+	if idx := strings.Index(html, "</head>"); idx != -1 {
+		return html[:idx] + styleTag + html[idx:]
+	}
+	return styleTag + html
 }
