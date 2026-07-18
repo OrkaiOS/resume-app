@@ -287,7 +287,7 @@ func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboar
 			},
 			{
 				Name:        "delete_pdf",
-				Description: "Delete a generated PDF for a resume or cover letter and clear its PDF record. The markdown content is preserved — only the PDF file is removed. The opportunity is determined automatically from the chat context. Use this when the user asks to delete or regenerate a PDF.",
+				Description: "Delete a generated PDF for a resume or cover letter and reset the document record to draft. The PDF file is removed from disk and the content is cleared — the document must be recreated from scratch. The opportunity is determined automatically from the chat context. Use this when the user asks to delete or regenerate a PDF.",
 				Parameters: json.RawMessage(`{
   "type": "object",
   "properties": {
@@ -701,6 +701,8 @@ func (r *ToolRegistry) execDeletePdf(ctx context.Context, argsJSON string) (stri
 			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to delete PDF file: %v", err)})
 		}
 		cl.PDFPath = ""
+		cl.MarkdownContent = ""
+		cl.Status = "draft"
 		if _, err := r.coverLetter.Upsert(ctx, cl); err != nil {
 			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to update record: %v", err)})
 		}
@@ -717,6 +719,8 @@ func (r *ToolRegistry) execDeletePdf(ctx context.Context, argsJSON string) (stri
 			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to delete PDF file: %v", err)})
 		}
 		resume.PDFPath = ""
+		resume.MarkdownContent = ""
+		resume.Status = "draft"
 		if _, err := r.resume.Upsert(ctx, resume); err != nil {
 			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to update record: %v", err)})
 		}
