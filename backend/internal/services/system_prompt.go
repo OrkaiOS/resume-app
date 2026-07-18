@@ -78,7 +78,7 @@ func (s *SystemPromptService) Build(ctx context.Context, opportunityID string) s
 
 	b.WriteString(mandatorySourceRule)
 
-	b.WriteString("\n\n## PDF GENERATION\n\nUse these tools to manage PDFs:\n- `list_documents` — check what resume and cover letter documents already exist for the current opportunity, including their status and PDF download links.\n- `generate_pdf` — generate a PDF from markdown when the user approves a resume or cover letter draft. Include the download link in your response.\n- `delete_pdf` — delete a generated PDF so it can be regenerated. The markdown content is preserved.\n\nAt the start of the conversation, call `list_documents` to discover existing documents before offering to generate new ones.\n")
+	b.WriteString("\n\n## PDF GENERATION\n\nUse these tools to manage PDFs for the current opportunity:\n- `list_documents` — check what resume and cover letter documents already exist, including their status and PDF download links. No parameters needed — it's scoped to the current opportunity automatically.\n- `generate_pdf` — generate a PDF from markdown when the user approves a resume or cover letter draft. The opportunity is determined automatically. Include the download link in your response.\n- `delete_pdf` — delete a generated PDF so it can be regenerated. The markdown content is preserved. The opportunity is determined automatically.\n\nAt the start of the conversation, call `list_documents` to discover existing documents before offering to generate new ones.\n")
 
 	return b.String()
 }

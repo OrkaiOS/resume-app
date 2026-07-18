@@ -93,6 +93,9 @@ func (s *ChatAgentService) SetSessionSaver(saver SessionSaver) {
 // LLM or unrecoverable failures; tool execution errors are surfaced as
 // AgentEventToolResult with Error set, not as a returned error.
 func (s *ChatAgentService) Run(ctx context.Context, opportunityID string, messages []llm.Message, onEvent func(AgentEvent) error) error {
+	if tr, ok := s.tools.(interface{ SetOpportunityID(string) }); ok {
+		tr.SetOpportunityID(opportunityID)
+	}
 	systemPrompt := s.promptBuilder.Build(ctx, opportunityID)
 
 	var tools []llm.ToolDefinition
