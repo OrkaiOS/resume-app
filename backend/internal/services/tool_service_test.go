@@ -101,8 +101,8 @@ func TestToolRegistryDefinitionsCount(t *testing.T) {
 	t.Parallel()
 	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	defs := registry.Definitions()
-	if len(defs) != 12 {
-		t.Errorf("expected 12 tool definitions, got %d", len(defs))
+	if len(defs) != 14 {
+		t.Errorf("expected 14 tool definitions, got %d", len(defs))
 	}
 }
 
@@ -254,5 +254,89 @@ func TestToolRegistryGeneratePdfToolInDefinitions(t *testing.T) {
 	}
 	if !found {
 		t.Error("generate_pdf tool not found in definitions")
+	}
+}
+
+func TestToolRegistryListDocumentsNoService(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "10",
+		Name:      "list_documents",
+		Arguments: `{"opportunityId":"1"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "document services not configured") {
+		t.Errorf("expected 'document services not configured', got %q", out)
+	}
+}
+
+func TestToolRegistryDeletePdfNoService(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "11",
+		Name:      "delete_pdf",
+		Arguments: `{"opportunityId":"1","documentType":"resume"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "document services not configured") {
+		t.Errorf("expected 'document services not configured', got %q", out)
+	}
+}
+
+func TestToolRegistryDeletePdfMissingArgs(t *testing.T) {
+	t.Parallel()
+	pdfSvc := NewPDFService(t.TempDir())
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "12",
+		Name:      "delete_pdf",
+		Arguments: `{"documentType":"resume"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "opportunityId is required") {
+		t.Errorf("expected 'opportunityId is required', got %q", out)
+	}
+
+	_, _ = pdfSvc, registry
+}
+
+func TestToolRegistryDeletePdfInvalidType(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "13",
+		Name:      "delete_pdf",
+		Arguments: `{"opportunityId":"1","documentType":"invalid"}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "must be 'resume'") {
+		t.Errorf("expected validation error, got %q", out)
+	}
+}
+
+func TestToolRegistryListDocumentsMissingArgs(t *testing.T) {
+	t.Parallel()
+	registry := NewToolRegistry(NewShellService(), nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	out, err := registry.Execute(context.Background(), llm.ToolCall{
+		ID:        "14",
+		Name:      "list_documents",
+		Arguments: `{}`,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(out, "opportunityId is required") {
+		t.Errorf("expected 'opportunityId is required', got %q", out)
 	}
 }

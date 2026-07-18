@@ -280,6 +280,29 @@ func NewToolRegistry(shell *ShellService, orkaiClient *orkai.OrkaiClient, onboar
   "required": ["markdown", "documentType", "opportunityId"]
 }`),
 			},
+			{
+				Name:        "list_documents",
+				Description: "List existing resume and cover letter documents for an opportunity. Shows status (draft, approved), whether a PDF has been generated, and download URLs if available. Use this to check what documents already exist before generating or deleting.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "opportunityId": {"type": "string", "description": "The opportunity ID to list documents for"}
+  },
+  "required": ["opportunityId"]
+}`),
+			},
+			{
+				Name:        "delete_pdf",
+				Description: "Delete a generated PDF for a resume or cover letter and clear its PDF record. The markdown content is preserved — only the PDF file is removed. Use this when the user asks to delete or regenerate a PDF.",
+				Parameters: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "opportunityId": {"type": "string", "description": "The opportunity ID the document belongs to"},
+    "documentType": {"type": "string", "enum": ["resume", "cover_letter"], "description": "Which document PDF to delete"}
+  },
+  "required": ["opportunityId", "documentType"]
+}`),
+			},
 		},
 	}
 }
@@ -319,6 +342,10 @@ func (r *ToolRegistry) Execute(ctx context.Context, call llm.ToolCall) (string, 
 		return r.execSaveUserInsight(ctx, call.Arguments)
 	case "generate_pdf":
 		return r.execGeneratePdf(ctx, call.Arguments)
+	case "list_documents":
+		return r.execListDocuments(ctx, call.Arguments)
+	case "delete_pdf":
+		return r.execDeletePdf(ctx, call.Arguments)
 	default:
 		return encodeJSON(map[string]string{"error": "unknown tool: " + call.Name})
 	}
@@ -579,6 +606,120 @@ func (r *ToolRegistry) execGeneratePdf(ctx context.Context, argsJSON string) (st
 		"downloadUrl": downloadURL,
 		"filename":    result.Filename,
 		"message":     "PDF generated successfully",
+	})
+}
+
+func (r *ToolRegistry) execListDocuments(ctx context.Context, argsJSON string) (string, error) {
+	var args struct {
+		OpportunityID string `json:"opportunityId"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execListDocuments: parse args: %w", err)
+	}
+	if args.OpportunityID == "" {
+		return encodeJSON(map[string]string{"error": "opportunityId is required"})
+	}
+	if r.resume == nil || r.coverLetter == nil {
+		return encodeJSON(map[string]string{"error": "document services not configured"})
+	}
+
+	result := map[string]interface{}{}
+
+	resume, err := r.resume.GetByOpportunity(ctx, args.OpportunityID)
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		result["resume"] = map[string]interface{}{"error": err.Error()}
+	} else if err == nil {
+		doc := map[string]interface{}{
+			"id":     resume.ID,
+			"status": resume.Status,
+			"hasPdf": resume.PDFPath != "",
+		}
+		if resume.PDFPath != "" {
+			doc["downloadUrl"] = fmt.Sprintf("/v1/api/opportunities/%s/resume/pdf", args.OpportunityID)
+			doc["filename"] = filepath.Base(resume.PDFPath)
+		}
+		result["resume"] = doc
+	} else {
+		result["resume"] = nil
+	}
+
+	coverLetter, err := r.coverLetter.GetByOpportunity(ctx, args.OpportunityID)
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		result["coverLetter"] = map[string]interface{}{"error": err.Error()}
+	} else if err == nil {
+		doc := map[string]interface{}{
+			"id":     coverLetter.ID,
+			"status": coverLetter.Status,
+			"hasPdf": coverLetter.PDFPath != "",
+		}
+		if coverLetter.PDFPath != "" {
+			doc["downloadUrl"] = fmt.Sprintf("/v1/api/opportunities/%s/cover-letter/pdf", args.OpportunityID)
+			doc["filename"] = filepath.Base(coverLetter.PDFPath)
+		}
+		result["coverLetter"] = doc
+	} else {
+		result["coverLetter"] = nil
+	}
+
+	return encodeJSON(result)
+}
+
+func (r *ToolRegistry) execDeletePdf(ctx context.Context, argsJSON string) (string, error) {
+	var args struct {
+		OpportunityID string `json:"opportunityId"`
+		DocumentType  string `json:"documentType"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("services.ToolRegistry.execDeletePdf: parse args: %w", err)
+	}
+	if args.OpportunityID == "" {
+		return encodeJSON(map[string]string{"error": "opportunityId is required"})
+	}
+	if args.DocumentType != "resume" && args.DocumentType != "cover_letter" {
+		return encodeJSON(map[string]string{"error": "documentType must be 'resume' or 'cover_letter'"})
+	}
+	if r.resume == nil || r.coverLetter == nil {
+		return encodeJSON(map[string]string{"error": "document services not configured"})
+	}
+
+	var pdfPath string
+	if args.DocumentType == "cover_letter" {
+		cl, err := r.coverLetter.GetByOpportunity(ctx, args.OpportunityID)
+		if err != nil {
+			return encodeJSON(map[string]string{"error": fmt.Sprintf("cover letter not found: %v", err)})
+		}
+		if cl.PDFPath == "" {
+			return encodeJSON(map[string]string{"error": "no PDF to delete for this cover letter"})
+		}
+		pdfPath = cl.PDFPath
+		if err := os.Remove(pdfPath); err != nil && !os.IsNotExist(err) {
+			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to delete PDF file: %v", err)})
+		}
+		cl.PDFPath = ""
+		if _, err := r.coverLetter.Upsert(ctx, cl); err != nil {
+			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to update record: %v", err)})
+		}
+	} else {
+		resume, err := r.resume.GetByOpportunity(ctx, args.OpportunityID)
+		if err != nil {
+			return encodeJSON(map[string]string{"error": fmt.Sprintf("resume not found: %v", err)})
+		}
+		if resume.PDFPath == "" {
+			return encodeJSON(map[string]string{"error": "no PDF to delete for this resume"})
+		}
+		pdfPath = resume.PDFPath
+		if err := os.Remove(pdfPath); err != nil && !os.IsNotExist(err) {
+			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to delete PDF file: %v", err)})
+		}
+		resume.PDFPath = ""
+		if _, err := r.resume.Upsert(ctx, resume); err != nil {
+			return encodeJSON(map[string]string{"error": fmt.Sprintf("failed to update record: %v", err)})
+		}
+	}
+
+	return encodeJSON(map[string]string{
+		"message":     "PDF deleted successfully",
+		"deletedPath": pdfPath,
 	})
 }
 
