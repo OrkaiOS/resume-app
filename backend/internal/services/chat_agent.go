@@ -71,14 +71,15 @@ type AgentToolResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
-// NewChatAgentService builds a ChatAgentService with the standard
-// maxIterations of 10.
+// NewChatAgentService builds a ChatAgentService with a generous
+// maxIterations (25) to prevent infinite loops without cutting off
+// normal multi-tool conversations.
 func NewChatAgentService(client llm.Client, promptBuilder PromptBuilder, tools llm.ToolRegistry) *ChatAgentService {
 	return &ChatAgentService{
 		client:        client,
 		promptBuilder: promptBuilder,
 		tools:         tools,
-		maxIterations: 10,
+		maxIterations: 25,
 	}
 }
 
